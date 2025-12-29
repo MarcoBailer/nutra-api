@@ -32,8 +32,8 @@ public class PerfilNutricional
     public ETipoObjetivo Objetivo { get; set; }
     public ENivelAtividadeFisica NivelAtividade { get; set; }
     public EPreferenciaAlimentar PreferenciaDieta { get; set; }
-    public virtual ICollection<RestricaoAlimentar> RestricoesAlimentares { get; set; } = new List<RestricaoAlimentar>();
-    public virtual ICollection<PreferenciaAlimentar>? PreferenciasAlimentares { get; set; } = new List<PreferenciaAlimentar>();
-    public virtual ICollection<RegistroBiometrico> HistoricoMedidas { get; set; }
+    public ICollection<RestricaoAlimentar> RestricoesAlimentares { get; set; } = new List<RestricaoAlimentar>();
+    public ICollection<PreferenciaAlimentar>? PreferenciasAlimentares { get; set; } = new List<PreferenciaAlimentar>();
+    public ICollection<RegistroBiometrico> HistoricoMedidas { get; set; }
     public ICollection<PerfilEquipamento> EquipamentoDisponivel { get; set; }
 }

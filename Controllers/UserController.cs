@@ -57,4 +57,42 @@ public class UserController : ControllerBase
             return BadRequest(ex.Message);
         }
     }
+
+    [HttpPost("registro-biometrico")]
+    public async Task<IActionResult> PostRegistroBiometrico([FromBody] RegistroBiometricoDto registroBiometricoDto)
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("Token inválido: ID do usuário não encontrado.");
+            }
+            var resultado = await _userProfile.PostRegistroBiometrico(userId, registroBiometricoDto);
+            return Ok(resultado);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    [HttpGet("buscar-perfil-nutricional")]
+    public async Task<IActionResult> GetPerfilNutricional()
+    {
+        try
+        {
+            var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("Token inválido: ID do usuário não encontrado.");
+            }
+            var perfil = await _userProfile.GetPerfilNutricional(userId);
+            return Ok(perfil);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
 }

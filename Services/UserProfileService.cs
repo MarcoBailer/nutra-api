@@ -128,40 +128,142 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao> PostPreferenciaAlimentar(string userId, int id, ETipoTabela tabela, ETipoPreferencia afinidade)
     {
-        var retorno = new RetornoPadrao();
-
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
-
-        if(perfil == null)
+        try
         {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Perfil nutricional não encontrado para o usuário.";
+            var retorno = new RetornoPadrao();
+
+            var perfil = await _context.PerfilNutricional
+                .FirstOrDefaultAsync(p => p.UserId == userId);
+
+            if (perfil == null)
+            {
+                retorno.Sucesso = false;
+                retorno.Mensagem = "Perfil nutricional não encontrado para o usuário.";
+                return retorno;
+            }
+
+            var alimento = await _busca.BuscaAlimentoPorIdAsync(id, tabela);
+
+            if (alimento == null)
+            {
+                retorno.Sucesso = false;
+                retorno.Mensagem = "Alimento não encontrado.";
+                return retorno;
+            }
+
+            var preferencia = new PreferenciaAlimentar
+            {
+                PerfilNutricionalId = perfil.Id,
+                AlimentoId = alimento.Id,
+                Tabela = tabela,
+                Tipo = afinidade
+            };
+
+            _context.PreferenciaAlimentar.Add(preferencia);
+            await _context.SaveChangesAsync();
+
+            retorno.Sucesso = true;
+            retorno.Mensagem = "Preferência alimentar registrada com sucesso.";
             return retorno;
         }
-
-        var alimento = await _busca.BuscaAlimentoPorIdAsync(id, tabela);
-
-        if(alimento == null)
+        catch (Exception)
         {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Alimento não encontrado.";
+            throw;
+        }
+    }
+
+    public async Task<RetornoPadrao> PostRegistroBiometrico(string userId, RegistroBiometricoDto registroBiometricoDto)
+    {
+        try
+        {
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+                throw new Exception("Usuário não encontrado.");
+
+            var retorno = new RetornoPadrao();
+            var perfil = await _context.PerfilNutricional
+                .FirstOrDefaultAsync(p => p.UserId == userId);
+
+            if (perfil == null)
+                throw new Exception("Perfil nutricional não encontrado para o usuário.");
+
+            var novoRegistroBiometrico = new RegistroBiometrico
+            {
+                CircunferenciaCinturaCm = registroBiometricoDto.CircunferenciaCinturaCm,
+                PercentualGordura = registroBiometricoDto.PercentualGordura,
+                PesoKg = registroBiometricoDto.PesoKg,
+                Data = DateTime.UtcNow,
+                PerfilNutricionalId = perfil.Id
+            };
+
+            _context.RegistroBiometrico.Add(novoRegistroBiometrico);
+            await _context.SaveChangesAsync();
+
+            retorno.Sucesso = true;
+            retorno.Mensagem = "Registro biométrico adicionado com sucesso.";
+
             return retorno;
         }
-
-        var preferencia = new PreferenciaAlimentar
+        catch (Exception)
         {
-            PerfilNutricionalId = perfil.Id,
-            AlimentoId = alimento.Id,
-            Tabela = tabela,
-            Tipo = afinidade
-        };
+            throw;
+        }
+    }
 
-        _context.PreferenciaAlimentar.Add(preferencia);
-        await _context.SaveChangesAsync();
+    public async Task<PerfilNutricionalDto> GetPerfilNutricional(string userId)
+    {
+        try
+        {
+            var perfil = await _context.PerfilNutricional
+                .Include(p => p.RestricoesAlimentares)
+                .Include(p => p.EquipamentoDisponivel)
+                .Include(p => p.PreferenciasAlimentares)
+                .FirstOrDefaultAsync(p => p.UserId == userId);
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Preferência alimentar registrada com sucesso.";
-        return retorno;
+            if (perfil == null)
+                throw new Exception("Perfil nutricional não encontrado para o usuário.");
+
+            var perfilDto = new PerfilNutricionalDto
+            {
+                UserId = perfil.UserId,
+                AlturaCm = perfil.AlturaCm,
+                PesoAtualKg = perfil.PesoAtualKg,
+                PercentualGorduraCorporal = perfil.PercentualGorduraCorporal,
+                FatorAtividade = perfil.FatorAtividade,
+                OcupacaoProfissional = perfil.OcupacaoProfissional,
+                PossuiDoencasPreExistentes = perfil.PossuiDoencasPreExistentes,
+                DescricaoCondicoesMedicas = perfil.DescricaoCondicoesMedicas,
+                PesoDesejadoKg = perfil.PesoDesejadoKg,
+                RefeicoesPorDiaDesejadas = perfil.RefeicoesPorDiaDesejadas,
+                TempoDisponivelPreparoMinutos = perfil.TempoDisponivelPreparoMinutos,
+                CircunferenciaCinturaCm = perfil.CircunferenciaCinturaCm,
+                DataNascimento = perfil.DataNascimento,
+                Genero = perfil.Genero,
+                Objetivo = perfil.Objetivo,
+                NivelAtividade = perfil.NivelAtividade,
+                PreferenciaDieta = perfil.PreferenciaDieta,
+                RestricoesIds = perfil.RestricoesAlimentares
+                    .Select(r => r.CompostoOrganico)
+                    .ToList(),
+                EquipamentosIds = perfil.EquipamentoDisponivel
+                    .Select(e => e.Equipamento)
+                    .ToList(),
+                Preferencias = perfil.PreferenciasAlimentares != null
+                    ? perfil.PreferenciasAlimentares
+                        .Select(pa => new PreferenciaCadastroDto
+                        {
+                            AlimentoId = pa.AlimentoId,
+                            Tabela = pa.Tabela,
+                            Tipo = pa.Tipo
+                        }).ToList()
+                    : new List<PreferenciaCadastroDto>()
+            };
+
+            return perfilDto;
+        }
+        catch (Exception)
+        {
+            throw;
+        }
     }
 }

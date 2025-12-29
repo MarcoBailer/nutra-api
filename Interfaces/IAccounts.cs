@@ -5,7 +5,5 @@ namespace Nutra.Interfaces
 {
     public interface IAccounts
     {
-        Task<RetornoPadrao> Register(RegisterModelDto newUser);
-        Task<AuthResponseDto> Login (LoginModelDto loginModel);
     }
 }

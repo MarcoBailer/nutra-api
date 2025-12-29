@@ -30,5 +30,5 @@ public class AlimentosContext : IdentityDbContext<ApplicationUser>
     public DbSet<PreferenciaAlimentar> PreferenciaAlimentar { get; set; }
     public DbSet<RegistroBiometrico> RegistroBiometrico { get; set; }
     public DbSet<RestricaoAlimentar> RestricaoAlimentar { get; set; }
-
+    public DbSet<RegistroAlimentar> RegistroAlimentar { get; set; }
 }
