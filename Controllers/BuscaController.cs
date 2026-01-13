@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Nutra.Enum;
 using Nutra.Interfaces;
 
@@ -6,6 +7,7 @@ namespace Nutra.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class BuscaController : ControllerBase
 {
     private readonly IBusca _buscaService;

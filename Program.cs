@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -7,10 +6,18 @@ using Nutra.Data;
 using Nutra.Interfaces;
 using Nutra.Models.Usuario;
 using Nutra.Services;
-using System.Text;
+using System.IdentityModel.Tokens.Jwt;
 
 var builder = WebApplication.CreateBuilder(args);
+
+JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
+
 var myNextAppPolicy = "_myNextAppPolicy";
+
+var authSettings = builder.Configuration.GetSection("Authentication");
+var authority = authSettings["Authority"];
+var clientId = authSettings["ClientId"];
+var clientSecret = authSettings["ClientSecret"];
 
 var connectionString = builder.Configuration
     ["ConnectionStrings:DefaultConnection"];
@@ -20,32 +27,119 @@ builder.Services.AddDbContextFactory<AlimentosContext>(options =>
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireNonAlphanumeric = true;
-    options.Password.RequiredLength = 8;
-    options.SignIn.RequireConfirmedEmail = true;
+    options.User.RequireUniqueEmail = true;
+    options.SignIn.RequireConfirmedAccount = false;
 })
 .AddEntityFrameworkStores<AlimentosContext>()
 .AddDefaultTokenProviders();
 
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.Name = "Nutra.Identity";
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.HttpOnly = true;
+
+    options.Events.OnRedirectToLogin = context =>
+    {
+        if (context.Request.Path.StartsWithSegments("/api"))
+        {
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return Task.CompletedTask;
+        }
+        context.Response.Redirect(context.RedirectUri);
+        return Task.CompletedTask;
+    };
+});
+
+builder.Services.ConfigureExternalCookie(options =>
+{
+    options.Cookie.SameSite = SameSiteMode.None;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+});
+
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultChallengeScheme = "OpenIdConnect";
 })
-.AddJwtBearer(options =>
+.AddOpenIdConnect("OpenIdConnect", options =>
 {
+    options.Authority = authority;
+    options.ClientId = clientId;
+    options.ClientSecret = clientSecret;
+    options.ResponseType = "code";
+    options.SignInScheme = IdentityConstants.ApplicationScheme;
+
+    options.SaveTokens = true;
+    options.GetClaimsFromUserInfoEndpoint = true;
+
+    // Configurações para Desenvolvimento Local (Ignorar erro de SSL)
+    options.RequireHttpsMetadata = false;
+    options.BackchannelHttpHandler = new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    };
+
     options.TokenValidationParameters = new TokenValidationParameters
     {
+        NameClaimType = "name",
+        RoleClaimType = "role",
         ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = builder.Configuration["JWT:Issuer"],
-        ValidAudience = builder.Configuration["JWT:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Key"]))
+        ValidIssuer = authority
+    };
+
+    // Escopos que vamos pedir ao Autenticador
+    options.Scope.Clear();
+    options.Scope.Add("openid");
+    options.Scope.Add("profile");
+    options.Scope.Add("email");
+    options.Scope.Add("offline_access");
+
+    options.Events = new Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
+            var signInManager = context.HttpContext.RequestServices.GetRequiredService<SignInManager<ApplicationUser>>();
+
+            var userIdExternal = context.Principal.FindFirst("sub")?.Value;
+            var userEmail = context.Principal.FindFirst("email")?.Value;
+            var userName = context.Principal.FindFirst("name")?.Value ?? userEmail;
+
+            if (!string.IsNullOrEmpty(userEmail))
+            {
+                var user = await userManager.FindByEmailAsync(userEmail);
+
+                if (user == null)
+                {
+                    user = new ApplicationUser
+                    {
+                        UserName = userEmail,
+                        Email = userEmail,
+                        NomeCompleto = userName,
+                        CPF = "",
+                        EmailConfirmed = true,
+                        SecurityStamp = Guid.NewGuid().ToString()
+                    };
+                    await userManager.CreateAsync(user);
+                }
+
+                var principal = await signInManager.CreateUserPrincipalAsync(user);
+                context.Principal = principal;
+            }
+        },
+
+        OnRedirectToIdentityProvider = context =>
+        {
+            if (context.Request.Path.StartsWithSegments("/api") &&
+               !context.Request.Path.StartsWithSegments("/api/Auth/login"))
+            {
+                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                context.HandleResponse();
+            }
+            return Task.CompletedTask;
+        }
     };
 });
 
@@ -56,7 +150,8 @@ builder.Services.AddCors(options =>
         policy => policy
             .WithOrigins("http://localhost:3000", builder.Configuration["AppSettings:BaseUrlFront"])
             .AllowAnyHeader()
-            .AllowAnyMethod());
+            .AllowAnyMethod()
+            .AllowCredentials());
 });
 
 
@@ -107,7 +202,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseCors(myNextAppPolicy);
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
