@@ -23,7 +23,7 @@ var connectionString = builder.Configuration
     ["ConnectionStrings:DefaultConnection"];
 
 builder.Services.AddDbContextFactory<AlimentosContext>(options =>
-    options.UseSqlServer(connectionString));
+    options.UseNpgsql(connectionString));
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
