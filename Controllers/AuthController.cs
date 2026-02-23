@@ -12,7 +12,8 @@ public class AuthController : ControllerBase
     {
         return Challenge(new AuthenticationProperties
         {
-            RedirectUri = "http://localhost:3000/pipboy"
+            // RedirectUri = "http://localhost:3000/pipboy"
+            RedirectUri = "https://marcola-g3-3500.tail9755bf.ts.net/pipboy"
         }, "OpenIdConnect");
     }
 
@@ -22,7 +23,8 @@ public class AuthController : ControllerBase
         // Desloga dos Cookies locais E avisa o Projeto A para deslogar lá também
         return SignOut(new AuthenticationProperties
         {
-            RedirectUri = "http://localhost:3000/"
+            // RedirectUri = "http://localhost:3000/"
+            RedirectUri = "https://marcola-g3-3500.tail9755bf.ts.net/"
         }, "Cookies", "OpenIdConnect");
     }
 }
