@@ -12,8 +12,8 @@ using Nutra.Data;
 namespace Nutra.Migrations
 {
     [DbContext(typeof(AlimentosContext))]
-    [Migration("20251213005937_UserProfile")]
-    partial class UserProfile
+    [Migration("20260113130938_InitialState")]
+    partial class InitialState
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -500,11 +500,13 @@ namespace Nutra.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("AlimentoOuGrupo")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("AlimentoId")
+                        .HasColumnType("int");
 
-                    b.Property<int?>("PerfilNutricionalId")
+                    b.Property<int>("PerfilNutricionalId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Tabela")
                         .HasColumnType("int");
 
                     b.Property<int>("Tipo")
@@ -517,6 +519,66 @@ namespace Nutra.Migrations
                     b.ToTable("PreferenciaAlimentar");
                 });
 
+            modelBuilder.Entity("Nutra.Models.RegraNutricional.RegistroAlimentar", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<long>("Id"));
+
+                    b.Property<double>("AguaTotal")
+                        .HasColumnType("float");
+
+                    b.Property<int>("AlimentoIdOrigem")
+                        .HasColumnType("int");
+
+                    b.Property<double>("CarboTotal")
+                        .HasColumnType("float");
+
+                    b.Property<string>("DadosNutricionaisCompletosJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("DataConsumo")
+                        .HasColumnType("datetime2");
+
+                    b.Property<double>("EnergiaKcalTotal")
+                        .HasColumnType("float");
+
+                    b.Property<double>("FibraTotal")
+                        .HasColumnType("float");
+
+                    b.Property<double>("GorduraTotal")
+                        .HasColumnType("float");
+
+                    b.Property<string>("NomeAlimentoSnapshot")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<double>("ProteinaTotal")
+                        .HasColumnType("float");
+
+                    b.Property<double>("QuantidadeConsumidaG")
+                        .HasColumnType("float");
+
+                    b.Property<int>("Refeicao")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TipoTabela")
+                        .HasColumnType("int");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RegistroAlimentar");
+                });
+
             modelBuilder.Entity("Nutra.Models.RegraNutricional.RestricaoAlimentar", b =>
                 {
                     b.Property<int>("Id")
@@ -525,11 +587,10 @@ namespace Nutra.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("CompostoOrganico")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int>("CompostoOrganico")
+                        .HasColumnType("int");
 
-                    b.Property<int?>("PerfilNutricionalId")
+                    b.Property<int>("PerfilNutricionalId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -646,7 +707,7 @@ namespace Nutra.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("MetaNutricional");
+                    b.ToTable("MetasNutricionais");
                 });
 
             modelBuilder.Entity("Nutra.Models.Usuario.PerfilEquipamento", b =>
@@ -667,7 +728,7 @@ namespace Nutra.Migrations
 
                     b.HasIndex("PerfilNutricionalId");
 
-                    b.ToTable("PerfilEquipamento");
+                    b.ToTable("PerfisEquipamentos");
                 });
 
             modelBuilder.Entity("Nutra.Models.Usuario.PerfilNutricional", b =>
@@ -679,6 +740,9 @@ namespace Nutra.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<double>("AlturaCm")
+                        .HasColumnType("float");
+
+                    b.Property<double?>("CircunferenciaCinturaCm")
                         .HasColumnType("float");
 
                     b.Property<DateTime>("DataNascimento")
@@ -755,7 +819,7 @@ namespace Nutra.Migrations
                     b.Property<double?>("CircunferenciaCinturaCm")
                         .HasColumnType("float");
 
-                    b.Property<DateTime>("DataRegistro")
+                    b.Property<DateTime>("Data")
                         .HasColumnType("datetime2");
 
                     b.Property<double?>("PercentualGordura")
@@ -827,16 +891,35 @@ namespace Nutra.Migrations
 
             modelBuilder.Entity("Nutra.Models.RegraNutricional.PreferenciaAlimentar", b =>
                 {
-                    b.HasOne("Nutra.Models.Usuario.PerfilNutricional", null)
+                    b.HasOne("Nutra.Models.Usuario.PerfilNutricional", "Perfil")
                         .WithMany("PreferenciasAlimentares")
-                        .HasForeignKey("PerfilNutricionalId");
+                        .HasForeignKey("PerfilNutricionalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Perfil");
+                });
+
+            modelBuilder.Entity("Nutra.Models.RegraNutricional.RegistroAlimentar", b =>
+                {
+                    b.HasOne("Nutra.Models.Usuario.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Nutra.Models.RegraNutricional.RestricaoAlimentar", b =>
                 {
-                    b.HasOne("Nutra.Models.Usuario.PerfilNutricional", null)
+                    b.HasOne("Nutra.Models.Usuario.PerfilNutricional", "Perfil")
                         .WithMany("RestricoesAlimentares")
-                        .HasForeignKey("PerfilNutricionalId");
+                        .HasForeignKey("PerfilNutricionalId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Perfil");
                 });
 
             modelBuilder.Entity("Nutra.Models.Usuario.PerfilEquipamento", b =>

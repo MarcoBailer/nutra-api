@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Nutra.Migrations
 {
     /// <inheritdoc />
-    public partial class UserProfile : Migration
+    public partial class InitialState : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -52,9 +52,96 @@ namespace Nutra.Migrations
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "Fabricantes",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Fabricante = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Produto = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Porcao = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKcal = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKj = table.Column<double>(type: "float", nullable: true),
+                    Proteinas = table.Column<double>(type: "float", nullable: true),
+                    Carboidratos = table.Column<double>(type: "float", nullable: true),
+                    Acucar = table.Column<double>(type: "float", nullable: true),
+                    Gorduras = table.Column<double>(type: "float", nullable: true),
+                    GorduraSaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraPoliinsaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraMonoinsaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraTrans = table.Column<double>(type: "float", nullable: true),
+                    Colesterol = table.Column<double>(type: "float", nullable: true),
+                    Fibras = table.Column<double>(type: "float", nullable: true),
+                    Sodio = table.Column<double>(type: "float", nullable: true),
+                    Potassio = table.Column<double>(type: "float", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Fabricantes", x => x.Id);
+                });
 
             migrationBuilder.CreateTable(
-                name: "MetaNutricional",
+                name: "FastFoods",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Fabricante = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Produto = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Porcao = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKcal = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKj = table.Column<double>(type: "float", nullable: true),
+                    Proteinas = table.Column<double>(type: "float", nullable: true),
+                    Carboidratos = table.Column<double>(type: "float", nullable: true),
+                    Acucar = table.Column<double>(type: "float", nullable: true),
+                    Gorduras = table.Column<double>(type: "float", nullable: true),
+                    GorduraSaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraPoliinsaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraMonoinsaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraTrans = table.Column<double>(type: "float", nullable: true),
+                    Colesterol = table.Column<double>(type: "float", nullable: true),
+                    Fibras = table.Column<double>(type: "float", nullable: true),
+                    Sodio = table.Column<double>(type: "float", nullable: true),
+                    Potassio = table.Column<double>(type: "float", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_FastFoods", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Genericos",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    CategoriaPrincipal = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    SubCategoria = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Produto = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Porcao = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKcal = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKj = table.Column<double>(type: "float", nullable: true),
+                    Proteinas = table.Column<double>(type: "float", nullable: true),
+                    Carboidratos = table.Column<double>(type: "float", nullable: true),
+                    Acucar = table.Column<double>(type: "float", nullable: true),
+                    Gorduras = table.Column<double>(type: "float", nullable: true),
+                    GorduraSaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraPoliinsaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraMonoinsaturada = table.Column<double>(type: "float", nullable: true),
+                    GorduraTrans = table.Column<double>(type: "float", nullable: true),
+                    Colesterol = table.Column<double>(type: "float", nullable: true),
+                    Fibras = table.Column<double>(type: "float", nullable: true),
+                    Sodio = table.Column<double>(type: "float", nullable: true),
+                    Potassio = table.Column<double>(type: "float", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Genericos", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "MetasNutricionais",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -70,7 +157,61 @@ namespace Nutra.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_MetaNutricional", x => x.Id);
+                    table.PrimaryKey("PK_MetasNutricionais", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Tbcas",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Nome = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    NomeCientifico = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Grupo = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Marca = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    AlfaTocoferolVitaminaEMg = table.Column<double>(type: "float", nullable: true),
+                    AcucarDeAdicaoG = table.Column<double>(type: "float", nullable: true),
+                    CarboidratoDisponivelG = table.Column<double>(type: "float", nullable: true),
+                    CarboidratoTotalG = table.Column<double>(type: "float", nullable: true),
+                    CinzasG = table.Column<double>(type: "float", nullable: true),
+                    CobreMg = table.Column<double>(type: "float", nullable: true),
+                    ColesterolMg = table.Column<double>(type: "float", nullable: true),
+                    CalcioMg = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKJ = table.Column<double>(type: "float", nullable: true),
+                    EnergiaKcal = table.Column<double>(type: "float", nullable: true),
+                    EquivalenteDeFolatoMcg = table.Column<double>(type: "float", nullable: true),
+                    FerroMg = table.Column<double>(type: "float", nullable: true),
+                    FibraAlimentarG = table.Column<double>(type: "float", nullable: true),
+                    FosforoMg = table.Column<double>(type: "float", nullable: true),
+                    LipidiosG = table.Column<double>(type: "float", nullable: true),
+                    MagnesioMg = table.Column<double>(type: "float", nullable: true),
+                    ManganesMg = table.Column<double>(type: "float", nullable: true),
+                    NiacinaMg = table.Column<double>(type: "float", nullable: true),
+                    PotassioMg = table.Column<double>(type: "float", nullable: true),
+                    ProteinaG = table.Column<double>(type: "float", nullable: true),
+                    RiboflavinaMg = table.Column<double>(type: "float", nullable: true),
+                    SalDeAdicaoG = table.Column<double>(type: "float", nullable: true),
+                    SelenioMcg = table.Column<double>(type: "float", nullable: true),
+                    SodioMg = table.Column<double>(type: "float", nullable: true),
+                    TiaminaMg = table.Column<double>(type: "float", nullable: true),
+                    UmidadeG = table.Column<double>(type: "float", nullable: true),
+                    VitaminaARaeMcg = table.Column<double>(type: "float", nullable: true),
+                    VitaminaAReMcg = table.Column<double>(type: "float", nullable: true),
+                    VitaminaB12Mcg = table.Column<double>(type: "float", nullable: true),
+                    VitaminaB6Mg = table.Column<double>(type: "float", nullable: true),
+                    VitaminaCMg = table.Column<double>(type: "float", nullable: true),
+                    VitaminaDMcg = table.Column<double>(type: "float", nullable: true),
+                    ZincoMg = table.Column<double>(type: "float", nullable: true),
+                    AcidosGraxosMonoinsaturadosG = table.Column<double>(type: "float", nullable: true),
+                    AcidosGraxosPoliinsaturadosG = table.Column<double>(type: "float", nullable: true),
+                    AcidosGraxosSaturadosG = table.Column<double>(type: "float", nullable: true),
+                    AcidosGraxosTransG = table.Column<double>(type: "float", nullable: true),
+                    AlcoolG = table.Column<double>(type: "float", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Tbcas", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -180,6 +321,38 @@ namespace Nutra.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "RegistroAlimentar",
+                columns: table => new
+                {
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    AlimentoIdOrigem = table.Column<int>(type: "int", nullable: false),
+                    NomeAlimentoSnapshot = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    TipoTabela = table.Column<int>(type: "int", nullable: false),
+                    QuantidadeConsumidaG = table.Column<double>(type: "float", nullable: false),
+                    DataConsumo = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Refeicao = table.Column<int>(type: "int", nullable: false),
+                    EnergiaKcalTotal = table.Column<double>(type: "float", nullable: false),
+                    ProteinaTotal = table.Column<double>(type: "float", nullable: false),
+                    CarboTotal = table.Column<double>(type: "float", nullable: false),
+                    GorduraTotal = table.Column<double>(type: "float", nullable: false),
+                    FibraTotal = table.Column<double>(type: "float", nullable: false),
+                    AguaTotal = table.Column<double>(type: "float", nullable: false),
+                    DadosNutricionaisCompletosJson = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_RegistroAlimentar", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RegistroAlimentar_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PerfilNutricional",
                 columns: table => new
                 {
@@ -197,6 +370,7 @@ namespace Nutra.Migrations
                     PesoDesejadoKg = table.Column<double>(type: "float", nullable: true),
                     RefeicoesPorDiaDesejadas = table.Column<int>(type: "int", nullable: false),
                     TempoDisponivelPreparoMinutos = table.Column<int>(type: "int", nullable: false),
+                    CircunferenciaCinturaCm = table.Column<double>(type: "float", nullable: true),
                     DataNascimento = table.Column<DateTime>(type: "datetime2", nullable: false),
                     Genero = table.Column<int>(type: "int", nullable: false),
                     Objetivo = table.Column<int>(type: "int", nullable: false),
@@ -213,14 +387,14 @@ namespace Nutra.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
-                        name: "FK_PerfilNutricional_MetaNutricional_MetaNutricionalAtualId",
+                        name: "FK_PerfilNutricional_MetasNutricionais_MetaNutricionalAtualId",
                         column: x => x.MetaNutricionalAtualId,
-                        principalTable: "MetaNutricional",
+                        principalTable: "MetasNutricionais",
                         principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
-                name: "PerfilEquipamento",
+                name: "PerfisEquipamentos",
                 columns: table => new
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
@@ -230,9 +404,9 @@ namespace Nutra.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_PerfilEquipamento", x => x.Id);
+                    table.PrimaryKey("PK_PerfisEquipamentos", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_PerfilEquipamento_PerfilNutricional_PerfilNutricionalId",
+                        name: "FK_PerfisEquipamentos_PerfilNutricional_PerfilNutricionalId",
                         column: x => x.PerfilNutricionalId,
                         principalTable: "PerfilNutricional",
                         principalColumn: "Id",
@@ -245,9 +419,10 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    AlimentoOuGrupo = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    Tipo = table.Column<int>(type: "int", nullable: false),
-                    PerfilNutricionalId = table.Column<int>(type: "int", nullable: true)
+                    PerfilNutricionalId = table.Column<int>(type: "int", nullable: false),
+                    AlimentoId = table.Column<int>(type: "int", nullable: false),
+                    Tabela = table.Column<int>(type: "int", nullable: false),
+                    Tipo = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -256,7 +431,8 @@ namespace Nutra.Migrations
                         name: "FK_PreferenciaAlimentar_PerfilNutricional_PerfilNutricionalId",
                         column: x => x.PerfilNutricionalId,
                         principalTable: "PerfilNutricional",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -265,7 +441,7 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    DataRegistro = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Data = table.Column<DateTime>(type: "datetime2", nullable: false),
                     PesoKg = table.Column<double>(type: "float", nullable: false),
                     PercentualGordura = table.Column<double>(type: "float", nullable: true),
                     CircunferenciaCinturaCm = table.Column<double>(type: "float", nullable: true),
@@ -288,8 +464,8 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
-                    CompostoOrganico = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    PerfilNutricionalId = table.Column<int>(type: "int", nullable: true)
+                    PerfilNutricionalId = table.Column<int>(type: "int", nullable: false),
+                    CompostoOrganico = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -298,7 +474,8 @@ namespace Nutra.Migrations
                         name: "FK_RestricaoAlimentar_PerfilNutricional_PerfilNutricionalId",
                         column: x => x.PerfilNutricionalId,
                         principalTable: "PerfilNutricional",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateIndex(
@@ -341,11 +518,6 @@ namespace Nutra.Migrations
                 filter: "[NormalizedUserName] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_PerfilEquipamento_PerfilNutricionalId",
-                table: "PerfilEquipamento",
-                column: "PerfilNutricionalId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_PerfilNutricional_MetaNutricionalAtualId",
                 table: "PerfilNutricional",
                 column: "MetaNutricionalAtualId",
@@ -359,9 +531,19 @@ namespace Nutra.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_PerfisEquipamentos_PerfilNutricionalId",
+                table: "PerfisEquipamentos",
+                column: "PerfilNutricionalId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PreferenciaAlimentar_PerfilNutricionalId",
                 table: "PreferenciaAlimentar",
                 column: "PerfilNutricionalId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_RegistroAlimentar_UserId",
+                table: "RegistroAlimentar",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RegistroBiometrico_PerfilNutricionalId",
@@ -402,10 +584,13 @@ namespace Nutra.Migrations
                 name: "Genericos");
 
             migrationBuilder.DropTable(
-                name: "PerfilEquipamento");
+                name: "PerfisEquipamentos");
 
             migrationBuilder.DropTable(
                 name: "PreferenciaAlimentar");
+
+            migrationBuilder.DropTable(
+                name: "RegistroAlimentar");
 
             migrationBuilder.DropTable(
                 name: "RegistroBiometrico");
@@ -426,7 +611,7 @@ namespace Nutra.Migrations
                 name: "AspNetUsers");
 
             migrationBuilder.DropTable(
-                name: "MetaNutricional");
+                name: "MetasNutricionais");
         }
     }
 }

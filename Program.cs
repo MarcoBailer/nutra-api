@@ -74,7 +74,7 @@ builder.Services.AddAuthentication(options =>
     options.SaveTokens = true;
     options.GetClaimsFromUserInfoEndpoint = true;
 
-    // Configurações para Desenvolvimento Local (Ignorar erro de SSL)
+    // Configuraï¿½ï¿½es para Desenvolvimento Local (Ignorar erro de SSL)
     options.RequireHttpsMetadata = false;
     options.BackchannelHttpHandler = new HttpClientHandler
     {
@@ -208,5 +208,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Health check endpoint (usado pelo Docker healthcheck)
+app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", service = "nutra-api" }))
+   .AllowAnonymous();
 
 app.Run();
