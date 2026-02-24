@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Nutra.Enum;
 using Nutra.Interfaces;
 using Nutra.Models.Dtos;
 using Nutra.Models.Dtos.Registro;
@@ -15,17 +16,26 @@ namespace Nutra.Controllers;
 public class AccountsController : ControllerBase
 {
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IAccounts _accounts;
+    private readonly INutricionista _nutricionista;
 
-    public AccountsController(UserManager<ApplicationUser> userManager)
+    public AccountsController(
+        UserManager<ApplicationUser> userManager,
+        IAccounts accounts,
+        INutricionista nutricionista)
     {
         _userManager = userManager;
+        _accounts = accounts;
+        _nutricionista = nutricionista;
     }
 
+    private string GetUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
+
     /// <summary>
-    /// Front-end uses a token generated externally to see the user's profile information stored locally.
+    /// Retorna o perfil completo do usuário autenticado (dados pessoais + role).
     /// </summary>
-    /// <returns>An <see cref="IActionResult"/> containing the user's profile information if found; otherwise, a NotFound result
-    /// if the user does not exist.</returns>
     [HttpGet("me")]
     public async Task<IActionResult> GetMyProfile()
     {
@@ -47,7 +57,8 @@ public class AccountsController : ControllerBase
                 UserName = userEmail,
                 Email = userEmail,
                 NomeCompleto = userName ?? "Usuário Novo",
-                CPF = "", // Será preenchido depois
+                CPF = "",
+                Role = ETipoRole.Paciente,
                 EmailConfirmed = true,
                 SecurityStamp = Guid.NewGuid().ToString()
             };
@@ -61,35 +72,116 @@ public class AccountsController : ControllerBase
 
         return Ok(new
         {
+            user.Id,
             user.NomeCompleto,
             user.Email,
             user.CPF,
-            Id = user.Id
+            user.Role,
+            user.DataNascimento,
+            user.Telefone,
+            user.FotoPerfilUrl,
+            user.Ativo,
+            user.CriadoEm,
+            Endereco = new
+            {
+                user.Logradouro,
+                user.Numero,
+                user.Complemento,
+                user.Bairro,
+                user.Cidade,
+                user.Estado,
+                user.CEP
+            }
         });
     }
 
-
     /// <summary>
-    /// Update only profile data managed by Projeto B
+    /// Atualiza dados pessoais do usuário: nome, CPF, endereço, telefone, etc.
     /// </summary>
-    /// <param name="model"></param>
-    /// <returns></returns>
     [HttpPut("update-profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto model)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var user = await _userManager.FindByIdAsync(userId);
+        try
+        {
+            var userId = GetUserId();
+            var resultado = await _accounts.AtualizarPerfilAsync(userId, model);
+            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
+        }
+    }
 
-        if (user == null) return NotFound();
+    /// <summary>
+    /// Desativa a conta do usuário (soft delete).
+    /// </summary>
+    [HttpPost("desativar")]
+    public async Task<IActionResult> DesativarConta()
+    {
+        try
+        {
+            var userId = GetUserId();
+            var resultado = await _accounts.DesativarContaAsync(userId);
+            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
+        }
+    }
 
-        // Atualiza apenas dados que são responsabilidade do Projeto B
-        user.CPF = model.Cpf;
-        user.NomeCompleto = model.NomeCompleto;
+    /// <summary>
+    /// Reativa a conta do usuário.
+    /// </summary>
+    [HttpPost("reativar")]
+    public async Task<IActionResult> ReativarConta()
+    {
+        try
+        {
+            var userId = GetUserId();
+            var resultado = await _accounts.ReativarContaAsync(userId);
+            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
+        }
+    }
 
-        var result = await _userManager.UpdateAsync(user);
+    /// <summary>
+    /// Paciente responde ao convite de vínculo com nutricionista.
+    /// </summary>
+    [HttpPost("vinculos/{vinculoId}/responder")]
+    public async Task<IActionResult> ResponderConvite(int vinculoId, [FromQuery] bool aceitar)
+    {
+        try
+        {
+            var userId = GetUserId();
+            var resultado = await _nutricionista.ResponderConviteAsync(userId, vinculoId, aceitar);
+            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
+        }
+    }
 
-        if (result.Succeeded) return Ok(user);
-
-        return BadRequest(result.Errors);
+    /// <summary>
+    /// Lista nutricionistas vinculados ao paciente.
+    /// </summary>
+    [HttpGet("meus-nutricionistas")]
+    public async Task<IActionResult> ListarMeusNutricionistas()
+    {
+        try
+        {
+            var userId = GetUserId();
+            var nutricionistas = await _nutricionista.ListarNutricionistasAsync(userId);
+            return Ok(nutricionistas);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
+        }
     }
 }
