@@ -146,11 +146,14 @@ builder.Services.AddAuthentication(options =>
 });
 
 
+// CORS: Usa a URL do frontend configurada em AppSettings ou variável de ambiente
+// Em Docker, AppSettings__BaseUrlFront é injetado via env var no docker-compose
+var frontendUrl = builder.Configuration["AppSettings:BaseUrlFront"] ?? "http://localhost:3000";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(name: myNextAppPolicy,
         policy => policy
-            .WithOrigins("http://localhost:3000", builder.Configuration["AppSettings:BaseUrlFront"])
+            .WithOrigins(frontendUrl)
             .AllowAnyHeader()
             .AllowAnyMethod()
             .AllowCredentials());
