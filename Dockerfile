@@ -36,7 +36,7 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Healthcheck interno do container
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
 EXPOSE 8080

@@ -5,6 +5,7 @@ using Microsoft.OpenApi.Models;
 using Nutra.Data;
 using Nutra.Interfaces;
 using Nutra.Models.Usuario;
+using Nutra.Seeder;
 using Nutra.Services;
 using System.IdentityModel.Tokens.Jwt;
 
@@ -30,6 +31,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
     options.User.RequireUniqueEmail = true;
     options.SignIn.RequireConfirmedAccount = false;
 })
+.AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<AlimentosContext>()
 .AddDefaultTokenProviders();
 
@@ -187,6 +189,11 @@ builder.Services.AddScoped<IBusca, BuscaService>();
 builder.Services.AddScoped<ICalculadoraNutricional, CalculadoraNutricionalService>();
 builder.Services.AddScoped<IUserProfile, UserProfileService>();
 builder.Services.AddScoped<IAccounts, AccountsService>();
+builder.Services.AddScoped<INutricionista, NutricionistaService>();
+builder.Services.AddScoped<IRefeicao, RefeicaoService>();
+builder.Services.AddScoped<IAvaliacaoNutricional, AvaliacaoNutricionalService>();
+builder.Services.AddScoped<IPlanoAlimentar, PlanoAlimentarService>();
+builder.Services.AddScoped<IDiarioAlimentar, DiarioAlimentarService>();
 
 
 builder.Services.AddControllers();
@@ -212,5 +219,40 @@ app.MapControllers();
 // Health check endpoint (usado pelo Docker healthcheck)
 app.MapGet("/api/health", () => Results.Ok(new { status = "healthy", service = "nutra-api" }))
    .AllowAnonymous();
+
+// Seed das tabelas de alimentos (executa apenas uma vez, se as tabelas estiverem vazias)
+using (var seedScope = app.Services.CreateScope())
+{
+    var logger = seedScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    // Seed de Roles do Identity
+    try
+    {
+        var roleManager = seedScope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+        string[] roles = ["Paciente", "Nutricionista", "Admin"];
+        foreach (var role in roles)
+        {
+            if (!await roleManager.RoleExistsAsync(role))
+            {
+                await roleManager.CreateAsync(new IdentityRole(role));
+                logger.LogInformation("Role '{Role}' criada com sucesso.", role);
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Erro ao criar roles do Identity.");
+    }
+
+    // Seed de Alimentos
+    try
+    {
+        await DatabaseSeeder.SeedAsync(app.Services, logger);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Erro ao executar o seed das tabelas de alimentos.");
+    }
+}
 
 app.Run();
