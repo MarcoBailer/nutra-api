@@ -24,7 +24,13 @@ var connectionString = builder.Configuration
     ["ConnectionStrings:DefaultConnection"];
 
 builder.Services.AddDbContextFactory<AlimentosContext>(options =>
-    options.UseNpgsql(connectionString));
+{
+    options.UseNpgsql(connectionString);
+    // Suprime aviso do EF Core 9 sobre mudanças pendentes no model
+    // Isso permite aplicar migrations existentes mesmo se o model local divergir
+    options.ConfigureWarnings(w => w.Ignore(
+        Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+});
 
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
