@@ -7,24 +7,30 @@ namespace Nutra.Controllers;
 [ApiController]
 public class AuthController : ControllerBase
 {
+    private readonly IConfiguration _configuration;
+
+    public AuthController(IConfiguration configuration)
+    {
+        _configuration = configuration;
+    }
+
     [HttpGet("login")]
     public IActionResult Login()
     {
+        var frontendUrl = _configuration["AppSettings:BaseUrlFront"] ?? "http://localhost:3000";
         return Challenge(new AuthenticationProperties
         {
-            // RedirectUri = "http://localhost:3000/pipboy"
-            RedirectUri = "https://marcola-g3-3500.tail9755bf.ts.net/pipboy"
+            RedirectUri = $"{frontendUrl}/pipboy"
         }, "OpenIdConnect");
     }
 
     [HttpGet("logout")]
     public IActionResult Logout()
     {
-        // Desloga dos Cookies locais E avisa o Projeto A para deslogar lá também
+        var frontendUrl = _configuration["AppSettings:BaseUrlFront"] ?? "http://localhost:3000";
         return SignOut(new AuthenticationProperties
         {
-            // RedirectUri = "http://localhost:3000/"
-            RedirectUri = "https://marcola-g3-3500.tail9755bf.ts.net/"
+            RedirectUri = $"{frontendUrl}/"
         }, "Cookies", "OpenIdConnect");
     }
 }
