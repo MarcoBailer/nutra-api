@@ -235,6 +235,20 @@ using (var migrationScope = app.Services.CreateScope())
     }
 }
 
+// ==================================================================
+// FORWARDED HEADERS (OBRIGATÓRIO PARA DOCKER/REVERSE PROXY)
+// ==================================================================
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor 
+                     | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
+});
+
+// ==================================================================
+// PATH BASE (OBRIGATÓRIO - app está montado em /nutra-api/)
+// ==================================================================
+app.UsePathBase("/nutra-api");
+
 // Swagger habilitado em todos os ambientes
 app.UseSwagger();
 app.UseSwaggerUI(c =>
