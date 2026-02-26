@@ -205,11 +205,43 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// ==================================================================
+// AUTO-MIGRATION (PARA DOCKER)
+// ==================================================================
+// Aplica migrations pendentes automaticamente no startup
+using (var migrationScope = app.Services.CreateScope())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    var services = migrationScope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    try
+    {
+        logger.LogInformation("Verificando migrations pendentes...");
+        var dbContext = services.GetRequiredService<AlimentosContext>();
+        
+        if (dbContext.Database.GetPendingMigrations().Any())
+        {
+            logger.LogInformation("Aplicando migrations...");
+            dbContext.Database.Migrate();
+            logger.LogInformation("Migrations aplicadas com sucesso.");
+        }
+        else
+        {
+            logger.LogInformation("Nenhuma migration pendente.");
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Erro ao aplicar migrations.");
+    }
 }
+
+// Swagger habilitado em todos os ambientes
+app.UseSwagger();
+app.UseSwaggerUI(c =>
+{
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Nutra API v1");
+    c.RoutePrefix = "swagger";
+});
 
 app.UseHttpsRedirection();
 app.UseCors(myNextAppPolicy);
