@@ -73,6 +73,10 @@ builder.Services.AddAuthentication(options =>
     options.ResponseType = "code";
     options.SignInScheme = IdentityConstants.ApplicationScheme;
 
+    // IMPORTANTE: Caminhos com prefixo /nutra-api porque a app está atrás do nginx
+    options.CallbackPath = "/nutra-api/signin-oidc";
+    options.SignedOutCallbackPath = "/nutra-api/signout-callback-oidc";
+
     options.SaveTokens = true;
     options.GetClaimsFromUserInfoEndpoint = true;
 
