@@ -73,9 +73,10 @@ builder.Services.AddAuthentication(options =>
     options.ResponseType = "code";
     options.SignInScheme = IdentityConstants.ApplicationScheme;
 
-    // IMPORTANTE: Caminhos com prefixo /nutra-api porque a app está atrás do nginx
-    options.CallbackPath = "/nutra-api/signin-oidc";
-    options.SignedOutCallbackPath = "/nutra-api/signout-callback-oidc";
+    // CallbackPath é relativo ao PathBase - NÃO incluir /nutra-api aqui
+    // PathBase(/nutra-api) + CallbackPath(/signin-oidc) = /nutra-api/signin-oidc
+    options.CallbackPath = "/signin-oidc";
+    options.SignedOutCallbackPath = "/signout-callback-oidc";
 
     options.SaveTokens = true;
     options.GetClaimsFromUserInfoEndpoint = true;
@@ -242,11 +243,16 @@ using (var migrationScope = app.Services.CreateScope())
 // ==================================================================
 // FORWARDED HEADERS (OBRIGATÓRIO PARA DOCKER/REVERSE PROXY)
 // ==================================================================
-app.UseForwardedHeaders(new ForwardedHeadersOptions
+// IMPORTANTE: Limpar KnownProxies/Networks para aceitar headers de qualquer proxy
+// Em produção com Docker/Nginx/Tailscale, o proxy não é localhost
+var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
     ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor 
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
-});
+};
+forwardedHeadersOptions.KnownNetworks.Clear();
+forwardedHeadersOptions.KnownProxies.Clear();
+app.UseForwardedHeaders(forwardedHeadersOptions);
 
 // ==================================================================
 // PATH BASE (OBRIGATÓRIO - app está montado em /nutra-api/)
