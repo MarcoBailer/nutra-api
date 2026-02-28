@@ -17,10 +17,8 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 // ==================================================================
 // DATA PROTECTION - Persistência de chaves para cookies sobreviverem restarts
 // ==================================================================
-var keysDir = Path.Combine(builder.Environment.ContentRootPath, "keys");
-Directory.CreateDirectory(keysDir);
 builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo(keysDir))
+    .PersistKeysToFileSystem(new DirectoryInfo("/app/keys"))
     .SetApplicationName("nutra-api");
 
 var myNextAppPolicy = "_myNextAppPolicy";
