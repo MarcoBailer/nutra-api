@@ -146,6 +146,30 @@ builder.Services.AddAuthentication(options =>
                 context.HandleResponse();
             }
             return Task.CompletedTask;
+        },
+        
+        // Tratamento de erros de autenticação (ex: código já usado, refresh da página de callback)
+        OnAuthenticationFailed = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("Falha na autenticação OIDC: {Error}", context.Exception.Message);
+            
+            // Redireciona para a página inicial com mensagem de erro
+            // Isso evita o 502 quando o usuário atualiza a página de callback
+            context.HandleResponse();
+            context.Response.Redirect("/?auth_error=session_expired");
+            return Task.CompletedTask;
+        },
+        
+        // Tratamento de erros remotos (ex: invalid_grant)
+        OnRemoteFailure = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("Falha remota na autenticação: {Error}", context.Failure?.Message);
+            
+            context.HandleResponse();
+            context.Response.Redirect("/?auth_error=remote_failure");
+            return Task.CompletedTask;
         }
     };
 });
