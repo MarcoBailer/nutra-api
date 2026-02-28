@@ -29,6 +29,11 @@ WORKDIR /app
 # Copia artefatos do build
 COPY --from=build /app/publish .
 
+# Cria diretório de keys (DataProtection) com permissão correta
+# VOLUME marca o ponto para Docker inicializar com as permissões corretas
+RUN mkdir -p /app/keys && chown appuser:appuser /app/keys
+VOLUME /app/keys
+
 # Ajusta permissões
 RUN chown -R appuser:appuser /app
 
