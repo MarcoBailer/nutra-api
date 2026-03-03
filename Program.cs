@@ -48,6 +48,8 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.Name = "Nutra.Identity";
+    // SameSite=None permite cookies cross-site (necessário quando frontend e backend estão em portas diferentes)
+    // Secure é obrigatório para SameSite=None
     options.Cookie.SameSite = SameSiteMode.None;
     options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
     options.Cookie.HttpOnly = true;
@@ -339,9 +341,12 @@ forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
 // ==================================================================
-// PATH BASE (OBRIGATÓRIO - app está montado em /nutra-api/)
+// PATH BASE (usa apenas em Docker, onde a app é montada em /nutra-api/)
 // ==================================================================
-app.UsePathBase("/nutra-api");
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOCKER_CONTAINER")))
+{
+    app.UsePathBase("/nutra-api");
+}
 
 // Swagger habilitado em todos os ambientes
 app.UseSwagger();

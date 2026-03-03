@@ -43,9 +43,16 @@ public class AccountsController : ControllerBase
         var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
         var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("name");
 
+        // Se não houver email, usa o sub (subject) como identificador único
         if (string.IsNullOrEmpty(userEmail))
         {
-            return Unauthorized("Token inválido: E-mail não encontrado nas claims.");
+            if (string.IsNullOrEmpty(userId))
+            {
+                return Unauthorized("Token inválido: Nem email nem sub encontrados nas claims.");
+            }
+            
+            // Usa o sub como email temporário
+            userEmail = $"{userId}@sso.local";
         }
 
         var user = await _userManager.FindByEmailAsync(userEmail);
