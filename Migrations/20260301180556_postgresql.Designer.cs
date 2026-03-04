@@ -12,8 +12,8 @@ using Nutra.Data;
 namespace Nutra.Migrations
 {
     [DbContext(typeof(AlimentosContext))]
-    [Migration("20260226015035_UpdateRecentModelChanges")]
-    partial class UpdateRecentModelChanges
+    [Migration("20260301180556_postgresql")]
+    partial class postgresql
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
