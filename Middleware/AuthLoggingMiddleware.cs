@@ -1,4 +1,5 @@
 using Nutra.Helper;
+using System.Security.Claims;
 
 namespace Nutra.Middleware;
 
@@ -15,7 +16,12 @@ public class AuthLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var userId = context.User?.FindFirst("sub")?.Value ?? context.User?.FindFirst("email")?.Value ?? "ANONYMOUS";
+        // Tenta múltiplos claim types para identificar o usuário
+        var userId = context.User?.FindFirst("sub")?.Value 
+                  ?? context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                  ?? context.User?.FindFirst("name")?.Value 
+                  ?? context.User?.FindFirst(ClaimTypes.Email)?.Value 
+                  ?? (context.User?.Identity?.IsAuthenticated == true ? "AUTHENTICATED" : "ANONYMOUS");
 
         // Log de entrada
         _authLogger.LogAuthStart(userId, context.Request.Method, context.Request.Path);

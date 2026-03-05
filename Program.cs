@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -11,6 +12,7 @@ using Nutra.Models.Usuario;
 using Nutra.Seeder;
 using Nutra.Services;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -74,8 +76,77 @@ builder.Services.ConfigureExternalCookie(options =>
 
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultScheme = IdentityConstants.ApplicationScheme;
-    options.DefaultChallengeScheme = "OpenIdConnect";
+    // Usar Bearer como padrão para APIs que recebem tokens JWT via Authorization header
+    options.DefaultScheme = "Bearer";
+    options.DefaultChallengeScheme = "Bearer";
+})
+.AddJwtBearer("Bearer", options =>
+{
+    options.Authority = authority;
+    options.RequireHttpsMetadata = false; // Dev only - mudar para true em produção
+
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = authority,
+        ValidateAudience = false, // Desabilitado: token não inclui 'aud' claim
+        ValidateLifetime = true,
+        NameClaimType = "name",
+        RoleClaimType = "role",
+        ClockSkew = TimeSpan.FromMinutes(5)
+    };
+
+    // Configuração para desenvolvimento (ignorar SSL)
+    options.BackchannelHttpHandler = new HttpClientHandler
+    {
+        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+    };
+
+    options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            
+            authLogger.LogException("JWT-AUTH-FAILED", context.Exception, "ANONYMOUS");
+            logger.LogError(context.Exception, $"[NutraFoodApi JWT] Falha na validação do token: {context.Exception.Message}");
+            
+            return Task.CompletedTask;
+        },
+        OnTokenValidated = context =>
+        {
+            var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            
+            // Log all claims for debugging
+            if (context.Principal?.Identity is ClaimsIdentity identity)
+            {
+                logger.LogInformation($"[NutraFoodApi JWT] Claims no token:");
+                foreach (var claim in identity.Claims)
+                {
+                    logger.LogInformation($"  - {claim.Type}: {claim.Value}");
+                }
+                
+                var userId = context.Principal?.FindFirst("sub")?.Value ?? 
+                            context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
+                            context.Principal?.FindFirst("client_id")?.Value ?? 
+                            "UNKNOWN";
+                
+                logger.LogInformation($"[NutraFoodApi JWT] IsAuthenticated: {context.Principal?.Identity?.IsAuthenticated}");
+                logger.LogInformation($"[NutraFoodApi JWT] AuthenticationType: {context.Principal?.Identity?.AuthenticationType}");
+                logger.LogInformation($"[NutraFoodApi JWT] UserId: {userId}");
+                
+                authLogger.LogOpenIdEvent("JWT-TOKEN-VALIDATED", $"Bearer token validado", userId);
+            }
+            else
+            {
+                logger.LogWarning("[NutraFoodApi JWT] Principal ou Identity é nulo!");
+            }
+            
+            return Task.CompletedTask;
+        }
+    };
 })
 .AddOpenIdConnect("OpenIdConnect", options =>
 {
@@ -233,6 +304,17 @@ builder.Services.AddAuthentication(options =>
 });
 
 
+// AUTORIZAÇÃO: Configura política padrão que requer qualquer usuário autenticado
+builder.Services.AddAuthorization(options =>
+{
+    // Política padrão: usuário deve estar autenticado via qualquer esquema
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .AddAuthenticationSchemes("Bearer", "OpenIdConnect")
+        .Build();
+});
+
+
 // CORS: Usa a URL do frontend configurada em AppSettings ou variável de ambiente
 // Em Docker, AppSettings__BaseUrlFront é injetado via env var no docker-compose
 var frontendUrl = builder.Configuration["AppSettings:BaseUrlFront"] ?? "http://localhost:3000";
@@ -359,11 +441,12 @@ app.UseSwaggerUI(c =>
 app.UseHttpsRedirection();
 app.UseCors(myNextAppPolicy);
 
-// ===== MIDDLEWARE DE LOGGING DE AUTENTICAÇÃO =====
-app.UseAuthLogging();
-
 app.UseAuthentication();
 app.UseAuthorization();
+
+// ===== MIDDLEWARE DE LOGGING DE AUTENTICAÇÃO =====
+// DEVE vir APÓS UseAuthentication para capturar o usuário autenticado
+app.UseAuthLogging();
 
 app.MapControllers();
 
