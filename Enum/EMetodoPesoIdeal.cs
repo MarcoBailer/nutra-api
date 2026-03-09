@@ -8,25 +8,25 @@ public enum EMetodoPesoIdeal
     /// <summary>
     /// Devine (1974) — Mais utilizado na prática clínica.
     /// </summary>
-    Devine = 1,
+    Devine = 0,
 
     /// <summary>
     /// Hamwi (1964).
     /// </summary>
-    Hamwi = 2,
+    Hamwi = 1,
 
     /// <summary>
     /// Robinson (1983).
     /// </summary>
-    Robinson = 3,
+    Robinson = 2,
 
     /// <summary>
     /// Miller (1983).
     /// </summary>
-    Miller = 4,
+    Miller = 3,
 
     /// <summary>
     /// Baseado no IMC ideal (22 kg/m²).
     /// </summary>
-    IMC = 5
+    IMC = 4
 }

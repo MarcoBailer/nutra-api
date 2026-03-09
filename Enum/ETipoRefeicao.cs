@@ -2,8 +2,13 @@
 
 public enum ETipoRefeicao
 {
-    cafe = 1,
-    almoco = 2,
-    tarde = 3,
-    jantar = 4,
+    CafeDaManha = 0,
+    LancheManha = 1,
+    Almoco = 2,
+    LancheTarde = 3,
+    Jantar = 4,
+    Ceia = 5,
+    PreTreino = 6,
+    PosTreino = 7,
+    Outro = 8,
 }

@@ -133,4 +133,43 @@ public class AlimentosController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpGet("genericos/alimento/{nome_generico}")]
+    public async Task<ActionResult<PaginatedResultDto<Genericos>>> BuscarAlimentosGenericosPorNome(
+    string nome_generico,
+    [FromQuery] int pageNumber = 1,
+    [FromQuery] int pageSize = 10)
+    {
+        if (string.IsNullOrWhiteSpace(nome_generico))
+        {
+            return BadRequest("O termo de busca não pode ser vazio.");
+        }
+
+        var alimentosEncontrados = _context.Genericos.AsQueryable();
+
+        var query = alimentosEncontrados.Where(a => a.Produto != null && a.Produto.ToLower().Contains(nome_generico.ToLower()));
+
+        var totalCount = await query.CountAsync();
+
+        var items = await query
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        if (totalCount == 0)
+        {
+            return NotFound("Nenhum alimento encontrado com os termos informados.");
+        }
+
+        var result = new PaginatedResultDto<Genericos>
+        {
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            TotalCount = totalCount,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize),
+            Items = items
+        };
+
+        return Ok(result);
+    }
 }

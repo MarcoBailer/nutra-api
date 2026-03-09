@@ -273,7 +273,7 @@ namespace Nutra.Services
                 Nome = g.Produto ?? "Desconhecido",
                 PorcaoReferencia = g.Porcao ?? 0,
                 MarcaFabricante = "Genérico",
-                Fonte = "Genéricos",
+                Fonte = "Genericos",
                 Macros = new()
                 {
                     EnergiaKcal = g.EnergiaKcal ?? 0,

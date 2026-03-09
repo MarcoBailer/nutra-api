@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Nutra.Data;
 using Nutra.Enum;
+using Nutra.Helper;
 using Nutra.Interfaces;
 using Nutra.Models;
 using Nutra.Models.Dtos;
@@ -182,8 +183,9 @@ public class DiarioAlimentarService : IDiarioAlimentar
 
     private async Task<DiarioDiaDto> MontarDiarioDia(string userId, DateTime dia)
     {
-        var diaInicio = dia.Date;
-        var diaFim = diaInicio.AddDays(1);
+        //DateTimeHelper.EnsureUtcDateTime
+        var diaInicio = DateTimeHelper.EnsureUtcDateTime(dia.Date);
+        var diaFim = DateTimeHelper.EnsureUtcDateTime(diaInicio.AddDays(1));
 
         // Buscar registros alimentares do dia
         var registros = await _context.RegistroAlimentar
@@ -449,6 +451,8 @@ public class DiarioAlimentarService : IDiarioAlimentar
         double porcaoRef = alimento.PorcaoReferencia > 0 ? alimento.PorcaoReferencia : 100.0;
         double fator = dto.QuantidadeConsumidaG / porcaoRef;
 
+        var dataConsumo = DateTimeHelper.EnsureUtcDateTime(dto.DataConsumo); // Garantir que a data de consumo seja UTC
+
         return new RegistroAlimentar
         {
             UserId = userId,
@@ -456,7 +460,7 @@ public class DiarioAlimentarService : IDiarioAlimentar
             NomeAlimentoSnapshot = alimento.Nome,
             TipoTabela = dto.TipoTabela,
             QuantidadeConsumidaG = dto.QuantidadeConsumidaG,
-            DataConsumo = DateTime.UtcNow,
+            DataConsumo = dataConsumo,
             Refeicao = dto.TipoRefeicao,
             EnergiaKcalTotal = Math.Round(alimento.Macros.EnergiaKcal * fator, 1),
             ProteinaTotal = Math.Round(alimento.Macros.Proteina * fator, 1),

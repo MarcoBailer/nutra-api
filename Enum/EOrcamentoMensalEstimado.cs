@@ -2,7 +2,8 @@
 
 public enum EOrcamentoMensalEstimado
 {
-    Baixo = 1,
-    Medio = 2,
-    Alto = 3
+    Economico = 0,
+    Medio = 1,
+    Alto = 2,
+    Premium = 3,
 }

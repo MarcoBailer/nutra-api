@@ -2,8 +2,8 @@
 
 public enum ENivelHabilidadeCulinaria
 {
-    Iniciante = 1,
-    Intermediario = 2,
-    Avancado = 3,
-    Expert = 4
+    Iniciante = 0,
+    Intermediario = 1,
+    Avancado = 2,
+    Chef = 3,
 }

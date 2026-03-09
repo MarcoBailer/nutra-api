@@ -2,8 +2,12 @@
 
 public enum EPreferenciaAlimentar
 {
-    Onivoro = 1,
-    Vegetariano = 2,
-    Vegano = 3,
-    Pescatariano = 4
+    SemRestricao = 0,
+    Vegetariano = 1,
+    Vegano = 2,
+    Pescetariano = 3,
+    LowCarb = 4,
+    Cetogenica = 5,
+    Paleo = 6,
+    Mediterranean = 7,
 }

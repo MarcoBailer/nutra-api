@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Nutra.Data;
 using Nutra.Enum;
+using Nutra.Helper;
 using Nutra.Interfaces;
 using Nutra.Models;
 using Nutra.Models.Dtos;
@@ -37,11 +38,11 @@ public class UserProfileService : IUserProfile
 
         try
         {
-            var user = await _userManager.FindByIdAsync(perfil.UserId);
+            var user = await _userManager.FindByEmailAsync(perfil.UserEmail);
             if (user == null)
                 throw new Exception("Usuário não encontrado.");
 
-            bool perfilJaExiste = _context.PerfilNutricional.Any(p => p.UserId == perfil.UserId);
+            bool perfilJaExiste = _context.PerfilNutricional.Any(p => p.User.Email == perfil.UserEmail);
             if (perfilJaExiste)
                 throw new Exception("Perfil nutricional já existe para este usuário.");
 
@@ -57,7 +58,7 @@ public class UserProfileService : IUserProfile
 
             var novoPerfil = new PerfilNutricional
             {
-                UserId = perfil.UserId,
+                UserId = user.Id,
                 User = user,
                 AlturaCm = perfil.AlturaCm,
                 PesoAtualKg = perfil.PesoAtualKg,
@@ -72,7 +73,7 @@ public class UserProfileService : IUserProfile
                 CircunferenciaCinturaCm = perfil.CircunferenciaCinturaCm,
                 CircunferenciaQuadrilCm = perfil.CircunferenciaQuadrilCm,
                 CircunferenciaBracoCm = perfil.CircunferenciaBracoCm,
-                DataNascimento = perfil.DataNascimento,
+                DataNascimento = DateTimeHelper.EnsureUtcDateTime(perfil.DataNascimento),
                 Genero = perfil.Genero,
                 Objetivo = perfil.Objetivo,
                 NivelAtividade = perfil.NivelAtividade,
@@ -115,21 +116,17 @@ public class UserProfileService : IUserProfile
                 },
             };
 
-            var metaCalculada = _calculadora.GerarMetaInicial(novoPerfil);
-
-            novoPerfil.MetaNutricional = metaCalculada;
-
-            metaCalculada.PerfilNutricional = novoPerfil;
-
             _context.PerfilNutricional.Add(novoPerfil);
-
             await _context.SaveChangesAsync();
 
-            if (novoPerfil.MetaNutricionalAtualId == null)
-            {
-                novoPerfil.MetaNutricionalAtualId = novoPerfil.MetaNutricional.Id;
-                await _context.SaveChangesAsync();
-            }
+
+            var metaNutricional = _calculadora.GerarMetaInicial(novoPerfil);
+            metaNutricional.PerfilNutricionalId = novoPerfil.Id;
+            _context.MetasNutricionais.Add(metaNutricional);
+            await _context.SaveChangesAsync();
+
+            novoPerfil.MetaNutricionalAtualId = metaNutricional.Id;
+            await _context.SaveChangesAsync();
 
             await transaction.CommitAsync();
 
@@ -604,7 +601,6 @@ public class UserProfileService : IUserProfile
 
         var perfilDto = new PerfilNutricionalDto
         {
-            UserId = perfil.UserId,
             AlturaCm = perfil.AlturaCm,
             PesoAtualKg = perfil.PesoAtualKg,
             PercentualGorduraCorporal = perfil.PercentualGorduraCorporal,

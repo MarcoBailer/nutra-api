@@ -5,8 +5,8 @@ namespace Nutra.Enum;
 /// </summary>
 public enum EStatusVinculo
 {
-    Pendente = 1,
-    Ativo = 2,
-    Inativo = 3,
-    Recusado = 4
+    Pendente = 0,
+    Ativo = 1,
+    Inativo = 2,
+    Recusado = 3
 }

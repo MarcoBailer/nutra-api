@@ -35,10 +35,13 @@ public class RefeicaoController : ControllerBase
     {
         var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (string.IsNullOrEmpty(userId))
-        {
             return Unauthorized("Token inválido: ID do usuário não encontrado.");
-        }
+
         var status = await _refeicao.ObterStatusDiario(userId);
+
+        if (status is null)
+            return NotFound(new { Sucesso = false, Mensagem = "Perfil nutricional não encontrado. Conclua o onboarding primeiro." });
+
         return Ok(status);
     }
 }

@@ -5,7 +5,7 @@ namespace Nutra.Models.Dtos;
 
 public class PerfilNutricionalDto
 {
-    public string UserId { get; set; } = string.Empty;
+    public string UserEmail { get; set; } = string.Empty;
 
     public double AlturaCm { get; set; }
     public double PesoAtualKg { get; set; }

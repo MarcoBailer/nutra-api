@@ -2,8 +2,8 @@
 
 public enum ETipoPreferencia
 {
-    Amo = 1,
-    Gosto = 2,
-    Desgosto = 3,
-    Odeio = 4
+    Gosta = 0,
+    NaoGosta = 1,
+    Alergia = 2,
+    Intolerancia = 3,
 }

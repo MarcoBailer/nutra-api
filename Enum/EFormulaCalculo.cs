@@ -10,18 +10,18 @@ public enum EFormulaCalculo
     /// Homens: (10 × peso) + (6.25 × altura) - (5 × idade) + 5
     /// Mulheres: (10 × peso) + (6.25 × altura) - (5 × idade) - 161
     /// </summary>
-    MifflinStJeor = 1,
+    MifflinStJeor = 0,
 
     /// <summary>
     /// Fórmula de Harris-Benedict revisada (Roza &amp; Shizgal, 1984).
     /// Homens: 88.362 + (13.397 × peso) + (4.799 × altura) - (5.677 × idade)
     /// Mulheres: 447.593 + (9.247 × peso) + (3.098 × altura) - (4.330 × idade)
     /// </summary>
-    HarrisBenedict = 2,
+    HarrisBenedict = 1,
 
     /// <summary>
     /// Fórmula de Katch-McArdle — usa massa magra, ideal quando se tem dados de bioimpedância.
     /// TMB = 370 + (21.6 × massa magra em kg)
     /// </summary>
-    KatchMcArdle = 3
+    KatchMcArdle = 2
 }

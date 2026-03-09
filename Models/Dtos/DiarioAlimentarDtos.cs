@@ -12,6 +12,7 @@ public class RegistroConsumoDto
     public ETipoTabela TipoTabela { get; set; }
     public double QuantidadeConsumidaG { get; set; }
     public ETipoRefeicao TipoRefeicao { get; set; }
+    public DateTime DataConsumo { get; set; }
 
     /// <summary>
     /// Item do plano alimentar que este registro cumpre (opcional).

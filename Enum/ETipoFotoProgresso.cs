@@ -5,8 +5,8 @@ namespace Nutra.Enum;
 /// </summary>
 public enum ETipoFotoProgresso
 {
-    Frontal = 1,
-    LateralEsquerdo = 2,
-    LateralDireito = 3,
-    Costas = 4
+    Frontal = 0,
+    LateralEsquerdo = 1,
+    LateralDireito = 2,
+    Costas = 3
 }

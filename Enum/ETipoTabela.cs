@@ -2,8 +2,8 @@
 
 public enum ETipoTabela
 {
-    Tbcas = 1,
-    Fabricantes = 2,
-    FastFoods = 3,
-    Genericos = 4
+    Tbcas = 0,
+    Fabricantes = 1,
+    FastFoods = 2,
+    Genericos = 3
 }

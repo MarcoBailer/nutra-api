@@ -114,7 +114,7 @@ builder.Services.AddAuthentication(options =>
             
             return Task.CompletedTask;
         },
-        OnTokenValidated = context =>
+        OnTokenValidated = async context =>
         {
             var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -135,16 +135,34 @@ builder.Services.AddAuthentication(options =>
                 
                 logger.LogInformation($"[NutraFoodApi JWT] IsAuthenticated: {context.Principal?.Identity?.IsAuthenticated}");
                 logger.LogInformation($"[NutraFoodApi JWT] AuthenticationType: {context.Principal?.Identity?.AuthenticationType}");
-                logger.LogInformation($"[NutraFoodApi JWT] UserId: {userId}");
+                logger.LogInformation($"[NutraFoodApi JWT] UserId (web-auth): {userId}");
                 
                 authLogger.LogOpenIdEvent("JWT-TOKEN-VALIDATED", $"Bearer token validado", userId);
+
+                // Resolve the local NutraApi user ID from the email claim and replace
+                // the web-auth sub so all controllers receive the correct local GUID.
+                var email = context.Principal?.FindFirst(ClaimTypes.Email)?.Value
+                         ?? context.Principal?.FindFirst("email")?.Value;
+
+                if (!string.IsNullOrEmpty(email))
+                {
+                    var userManager = context.HttpContext.RequestServices
+                        .GetRequiredService<UserManager<ApplicationUser>>();
+                    var localUser = await userManager.FindByEmailAsync(email);
+                    if (localUser != null)
+                    {
+                        var existing = identity.FindFirst(ClaimTypes.NameIdentifier);
+                        if (existing != null)
+                            identity.RemoveClaim(existing);
+                        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, localUser.Id));
+                        logger.LogInformation($"[NutraFoodApi JWT] Resolved local NutraApi userId: {localUser.Id}");
+                    }
+                }
             }
             else
             {
                 logger.LogWarning("[NutraFoodApi JWT] Principal ou Identity é nulo!");
             }
-            
-            return Task.CompletedTask;
         }
     };
 })

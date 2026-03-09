@@ -21,7 +21,7 @@ public class UserController : ControllerBase
 
     private string GetUserId() =>
         User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
+        ?? throw new UnauthorizedAccessException("Usu�rio n�o autenticado.");
 
     // ===================== PERFIL NUTRICIONAL =====================
 
@@ -30,8 +30,10 @@ public class UserController : ControllerBase
     {
         try
         {
-            var userId = GetUserId();
-            perfilNutricional.UserId = userId;
+            var userEmail = User.FindFirstValue(ClaimTypes.Email)
+                          ?? User.FindFirstValue("email")
+                          ?? throw new UnauthorizedAccessException("Usu�rio n�o autenticado.");
+            perfilNutricional.UserEmail = userEmail;
             var perfil = await _userProfile.PostPerfilNutricional(perfilNutricional);
             return Ok(perfil);
         }
@@ -47,7 +49,6 @@ public class UserController : ControllerBase
         try
         {
             var userId = GetUserId();
-            perfilNutricional.UserId = userId;
             var resultado = await _userProfile.AtualizarPerfilNutricional(userId, perfilNutricional);
             return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
         }
@@ -72,7 +73,7 @@ public class UserController : ControllerBase
         }
     }
 
-    // ===================== PREFERÊNCIAS ALIMENTARES =====================
+    // ===================== PREFER�NCIAS ALIMENTARES =====================
 
     [HttpPost("preferencia-alimentar/{id}/{tabela}/{afinidade}")]
     public async Task<IActionResult> PostPreferenciaAlimentar(int id, ETipoTabela tabela, ETipoPreferencia afinidade)
@@ -104,7 +105,7 @@ public class UserController : ControllerBase
         }
     }
 
-    // ===================== REGISTRO BIOMÉTRICO =====================
+    // ===================== REGISTRO BIOM�TRICO =====================
 
     [HttpPost("registro-biometrico")]
     public async Task<IActionResult> PostRegistroBiometrico([FromBody] RegistroBiometricoDto registroBiometricoDto)
@@ -136,7 +137,7 @@ public class UserController : ControllerBase
         }
     }
 
-    // ===================== HISTÓRICO CLÍNICO =====================
+    // ===================== HIST�RICO CL�NICO =====================
 
     [HttpGet("historico-clinico")]
     public async Task<IActionResult> ListarHistoricoClinico()

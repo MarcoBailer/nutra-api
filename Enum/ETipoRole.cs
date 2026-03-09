@@ -2,7 +2,7 @@ namespace Nutra.Enum;
 
 public enum ETipoRole
 {
-    Paciente = 1,
-    Nutricionista = 2,
-    Admin = 3
+    Paciente = 0,
+    Nutricionista = 1,
+    Admin = 2
 }

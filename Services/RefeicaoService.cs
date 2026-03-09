@@ -60,9 +60,16 @@ public class RefeicaoService : IRefeicao
         return retorno;
     }
 
-    public async Task<StatusDiarioDto> ObterStatusDiario(string userId)
+    public async Task<StatusDiarioDto?> ObterStatusDiario(string userId)
     {
         var hoje = DateTime.UtcNow.Date;
+
+        var perfil = await _context.PerfilNutricional
+            .Include(p => p.MetaNutricional)
+            .FirstOrDefaultAsync(p => p.UserId == userId);
+
+        if (perfil?.MetaNutricional is not { } meta)
+            return null;
 
         var consumidoHoje = await _context.RegistroAlimentar
             .Where(r => r.UserId == userId && r.DataConsumo.Date == hoje)
@@ -71,24 +78,30 @@ public class RefeicaoService : IRefeicao
             {
                 Calorias = g.Sum(x => x.EnergiaKcalTotal),
                 Proteinas = g.Sum(x => x.ProteinaTotal),
+                Carboidratos = g.Sum(x => x.CarboTotal),
+                Gorduras = g.Sum(x => x.GorduraTotal),
+                Fibras = g.Sum(x => x.FibraTotal),
                 Agua = g.Sum(x => x.AguaTotal)
             })
             .FirstOrDefaultAsync();
 
-        var perfil = await _context.PerfilNutricional
-            .Include(p => p.MetaNutricional)
-            .FirstOrDefaultAsync(p => p.UserId == userId);
-
-        var meta = perfil.MetaNutricional;
-
         return new StatusDiarioDto
         {
-            CaloriasConsumidas = consumidoHoje?.Calorias ?? 0,
-            CaloriasMeta = meta.CaloriasDiarias,
-            SaldoCalorico = (meta.CaloriasDiarias - (consumidoHoje?.Calorias ?? 0)),
+            CaloriasConsumidas   = consumidoHoje?.Calorias      ?? 0,
+            ProteinasConsumidas  = consumidoHoje?.Proteinas     ?? 0,
+            CarboidratosConsumidos = consumidoHoje?.Carboidratos ?? 0,
+            GordurasConsumidas   = consumidoHoje?.Gorduras      ?? 0,
+            FibrasConsumidas     = consumidoHoje?.Fibras        ?? 0,
+            AguaConsumida        = consumidoHoje?.Agua          ?? 0,
 
-            AguaConsumida = consumidoHoje?.Agua ?? 0,
-            AguaMeta = meta.AguaDiaria
+            CaloriasMeta         = meta.CaloriasDiarias,
+            ProteinasMeta        = meta.ProteinasDiarias,
+            CarboidratosMeta     = meta.CarboidratosDiarios,
+            GordurasMeta         = meta.GordurasDiarias,
+            FibrasMeta           = meta.FibraDiaria,
+            AguaMeta             = meta.AguaDiaria,
+
+            SaldoCalorico        = meta.CaloriasDiarias - (consumidoHoje?.Calorias ?? 0),
         };
     }
 }

@@ -2,9 +2,9 @@ namespace Nutra.Enum;
 
 public enum EStatusPlano
 {
-    Rascunho = 1,
-    Ativo = 2,
-    Pausado = 3,
-    Finalizado = 4,
-    Cancelado = 5
+    Rascunho = 0,
+    Ativo = 1,
+    Pausado = 2,
+    Finalizado = 3,
+    Cancelado = 4
 }
