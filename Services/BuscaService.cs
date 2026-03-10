@@ -143,6 +143,9 @@ namespace Nutra.Services
                 MarcaFabricante = t.Marca,
                 Grupo = t.Grupo ?? "Desconhecido",
                 Fonte = "TBCA",
+                DescricaoPorcao = "100 g",
+                Unidade = "g",
+                PorcaoReferencia = 100,
                 Macros = new()
                 {
                     EnergiaKcal = t.EnergiaKcal ?? 0,
@@ -202,6 +205,9 @@ namespace Nutra.Services
                 Id = f.Id,
                 Nome = f.Produto ?? "Desconhecido",
                 MarcaFabricante = f.Fabricante ?? "Genérico",
+                DescricaoPorcao = f.PorcaoTexto,
+                Dose = f.Dose,
+                Unidade = f.Unidade,
                 PorcaoReferencia = f.Porcao ?? 0,
                 Fonte = "Fabricantes",
                 Macros = new()
@@ -236,6 +242,9 @@ namespace Nutra.Services
             {
                 Id = ff.Id,
                 Nome = ff.Produto ?? "Desconhecido",
+                DescricaoPorcao = ff.PorcaoTexto,
+                Dose = ff.Dose,
+                Unidade = ff.Unidade,
                 PorcaoReferencia = ff.Porcao ?? 0,
                 MarcaFabricante = ff.Fabricante ?? "Restaurante",
                 Fonte = "FastFood",
@@ -271,6 +280,9 @@ namespace Nutra.Services
             {
                 Id = g.Id,
                 Nome = g.Produto ?? "Desconhecido",
+                DescricaoPorcao = g.PorcaoTexto,
+                Dose = g.Dose,
+                Unidade = g.Unidade,
                 PorcaoReferencia = g.Porcao ?? 0,
                 MarcaFabricante = "Genérico",
                 Fonte = "Genéricos",

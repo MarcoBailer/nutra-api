@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Nutra.Data;
@@ -11,9 +12,11 @@ using Nutra.Data;
 namespace Nutra.Migrations
 {
     [DbContext(typeof(AlimentosContext))]
-    partial class AlimentosContextModelSnapshot : ModelSnapshot
+    [Migration("20260310165857_AddStructuredFoodPortions")]
+    partial class AddStructuredFoodPortions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

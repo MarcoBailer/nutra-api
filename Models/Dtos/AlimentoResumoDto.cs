@@ -8,6 +8,9 @@ public class AlimentoResumoDto
     public string MarcaFabricante { get; set; } = string.Empty;
     public string Grupo { get; set; } = string.Empty;
     public string Fonte { get; set; } = string.Empty; // TBCA, Fabricante, Fast Food, Genérico.
+    public string? DescricaoPorcao { get; set; }
+    public string? Dose { get; set; }
+    public string? Unidade { get; set; }
     public double PorcaoReferencia { get; set; }
 
     public MacrosInfo Macros { get; set; } = new();

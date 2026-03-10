@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace Nutra.Models.Alimentos;
 
+/// <summary>
+/// Classe gerada a partir da tabela "tbca", porção de 100g.
+/// </summary>
 public partial class Tbca
 {
     public int Id { get; set; }
