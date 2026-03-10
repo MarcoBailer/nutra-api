@@ -7,7 +7,7 @@ namespace Nutra.Seeder;
 
 /// <summary>
 /// Popula as tabelas de alimentos a partir do banco SQLite embutido.
-/// Executa apenas uma vez — se qualquer tabela já tiver dados, o seed é ignorado.
+/// Popula tabelas vazias e corrige metadados de porção em tabelas ja populadas.
 /// </summary>
 public static class DatabaseSeeder
 {
@@ -17,16 +17,6 @@ public static class DatabaseSeeder
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AlimentosContext>();
-
-        // Verifica se já foi populado (qualquer tabela com dados = já rodou)
-        if (await db.Tbcas.AnyAsync() ||
-            await db.FastFoods.AnyAsync() ||
-            await db.Fabricantes.AnyAsync() ||
-            await db.Genericos.AnyAsync())
-        {
-            logger.LogInformation("Tabelas de alimentos já populadas. Seed ignorado.");
-            return;
-        }
 
         // Localiza o arquivo alimentos.db embutido no projeto
         var dbPath = Path.Combine(AppContext.BaseDirectory, "Data", "alimentos.db");
@@ -50,6 +40,12 @@ public static class DatabaseSeeder
 
     private static async Task SeedTbcaAsync(SqliteSourceContext sqlite, AlimentosContext db, ILogger logger)
     {
+        if (await db.Tbcas.AnyAsync())
+        {
+            logger.LogInformation("TBCA ja populada. Seed ignorado para esta tabela.");
+            return;
+        }
+
         var itensAntigos = await sqlite.Tbcas.AsNoTracking().ToListAsync();
         logger.LogInformation("TBCA: {Count} registros encontrados no SQLite.", itensAntigos.Count);
 
@@ -60,6 +56,7 @@ public static class DatabaseSeeder
         {
             lote.Add(new Tbca
             {
+                Id = old.Id,
                 Nome = old.Nome ?? "Desconhecido",
                 NomeCientifico = old.NomeCientifico ?? "Desconhecido",
                 Grupo = old.Grupo ?? "Desconhecido",
@@ -130,16 +127,28 @@ public static class DatabaseSeeder
         var itensAntigos = await sqlite.FastFoods.AsNoTracking().ToListAsync();
         logger.LogInformation("FastFood: {Count} registros encontrados no SQLite.", itensAntigos.Count);
 
+        if (await db.FastFoods.AnyAsync())
+        {
+            await AtualizarPorcoesFastFoodAsync(itensAntigos, db, logger);
+            return;
+        }
+
         var lote = new List<FastFood>();
         int total = 0;
 
         foreach (var old in itensAntigos)
         {
+            var porcao = PorcaoParser.Parse(old.Porcao);
+
             lote.Add(new FastFood
             {
+                Id = old.Id,
                 Produto = old.Produto ?? "Desconhecido",
                 Fabricante = old.Fabricante ?? "Desconhecido",
-                Porcao = Conversor.LimparEConverter(old.Porcao),
+                PorcaoTexto = porcao.TextoOriginal,
+                Dose = porcao.Dose,
+                Unidade = porcao.Unidade,
+                Porcao = porcao.Quantidade,
                 EnergiaKcal = Conversor.LimparEConverter(old.EnergiaKcal),
                 EnergiaKj = Conversor.LimparEConverter(old.EnergiaKj),
                 Proteinas = Conversor.LimparEConverter(old.Proteinas),
@@ -182,16 +191,28 @@ public static class DatabaseSeeder
         var itensAntigos = await sqlite.Fabricantes.AsNoTracking().ToListAsync();
         logger.LogInformation("Fabricantes: {Count} registros encontrados no SQLite.", itensAntigos.Count);
 
+        if (await db.Fabricantes.AnyAsync())
+        {
+            await AtualizarPorcoesFabricantesAsync(itensAntigos, db, logger);
+            return;
+        }
+
         var lote = new List<Fabricantes>();
         int total = 0;
 
         foreach (var old in itensAntigos)
         {
+            var porcao = PorcaoParser.Parse(old.Porcao);
+
             lote.Add(new Fabricantes
             {
+                Id = old.Id,
                 Fabricante = old.Fabricante ?? "Desconhecido",
                 Produto = old.Produto ?? "Desconhecido",
-                Porcao = Conversor.LimparEConverter(old.Porcao),
+                PorcaoTexto = porcao.TextoOriginal,
+                Dose = porcao.Dose,
+                Unidade = porcao.Unidade,
+                Porcao = porcao.Quantidade,
                 EnergiaKcal = Conversor.LimparEConverter(old.EnergiaKcal),
                 EnergiaKj = Conversor.LimparEConverter(old.EnergiaKj),
                 Proteinas = Conversor.LimparEConverter(old.Proteinas),
@@ -234,17 +255,29 @@ public static class DatabaseSeeder
         var itensAntigos = await sqlite.Genericos.AsNoTracking().ToListAsync();
         logger.LogInformation("Genericos: {Count} registros encontrados no SQLite.", itensAntigos.Count);
 
+        if (await db.Genericos.AnyAsync())
+        {
+            await AtualizarPorcoesGenericosAsync(itensAntigos, db, logger);
+            return;
+        }
+
         var lote = new List<Genericos>();
         int total = 0;
 
         foreach (var old in itensAntigos)
         {
+            var porcao = PorcaoParser.Parse(old.Porcao);
+
             lote.Add(new Genericos
             {
+                Id = old.Id,
                 CategoriaPrincipal = old.CategoriaPrincipal ?? "Desconhecido",
                 SubCategoria = old.SubCategoria ?? "Desconhecido",
                 Produto = old.Produto ?? "Desconhecido",
-                Porcao = Conversor.LimparEConverter(old.Porcao),
+                PorcaoTexto = porcao.TextoOriginal,
+                Dose = porcao.Dose,
+                Unidade = porcao.Unidade,
+                Porcao = porcao.Quantidade,
                 EnergiaKcal = Conversor.LimparEConverter(old.EnergiaKcal),
                 EnergiaKj = Conversor.LimparEConverter(old.EnergiaKj),
                 Proteinas = Conversor.LimparEConverter(old.Proteinas),
@@ -280,5 +313,104 @@ public static class DatabaseSeeder
         }
 
         logger.LogInformation("Genericos concluída! Total: {Total}", total);
+    }
+
+    private static async Task AtualizarPorcoesFastFoodAsync(
+        List<Seeder.Models.FastFoodSqlite> itensAntigos,
+        AlimentosContext db,
+        ILogger logger)
+    {
+        var existentes = await db.FastFoods.ToDictionaryAsync(item => item.Id);
+        var atualizados = 0;
+
+        foreach (var old in itensAntigos)
+        {
+            if (!existentes.TryGetValue(old.Id, out var entity))
+            {
+                continue;
+            }
+
+            AplicarPorcao(entity, old.Porcao);
+            atualizados++;
+        }
+
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        logger.LogInformation("FastFood ja populada. Metadados de porcao atualizados: {Total}", atualizados);
+    }
+
+    private static async Task AtualizarPorcoesFabricantesAsync(
+        List<Seeder.Models.FabricantesSqlite> itensAntigos,
+        AlimentosContext db,
+        ILogger logger)
+    {
+        var existentes = await db.Fabricantes.ToDictionaryAsync(item => item.Id);
+        var atualizados = 0;
+
+        foreach (var old in itensAntigos)
+        {
+            if (!existentes.TryGetValue(old.Id, out var entity))
+            {
+                continue;
+            }
+
+            AplicarPorcao(entity, old.Porcao);
+            atualizados++;
+        }
+
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        logger.LogInformation("Fabricantes ja populada. Metadados de porcao atualizados: {Total}", atualizados);
+    }
+
+    private static async Task AtualizarPorcoesGenericosAsync(
+        List<Seeder.Models.GenericosSqlite> itensAntigos,
+        AlimentosContext db,
+        ILogger logger)
+    {
+        var existentes = await db.Genericos.ToDictionaryAsync(item => item.Id);
+        var atualizados = 0;
+
+        foreach (var old in itensAntigos)
+        {
+            if (!existentes.TryGetValue(old.Id, out var entity))
+            {
+                continue;
+            }
+
+            AplicarPorcao(entity, old.Porcao);
+            atualizados++;
+        }
+
+        await db.SaveChangesAsync();
+        db.ChangeTracker.Clear();
+        logger.LogInformation("Genericos ja populada. Metadados de porcao atualizados: {Total}", atualizados);
+    }
+
+    private static void AplicarPorcao(FastFood entity, string? porcaoTexto)
+    {
+        var porcao = PorcaoParser.Parse(porcaoTexto);
+        entity.PorcaoTexto = porcao.TextoOriginal;
+        entity.Dose = porcao.Dose;
+        entity.Unidade = porcao.Unidade;
+        entity.Porcao = porcao.Quantidade;
+    }
+
+    private static void AplicarPorcao(Fabricantes entity, string? porcaoTexto)
+    {
+        var porcao = PorcaoParser.Parse(porcaoTexto);
+        entity.PorcaoTexto = porcao.TextoOriginal;
+        entity.Dose = porcao.Dose;
+        entity.Unidade = porcao.Unidade;
+        entity.Porcao = porcao.Quantidade;
+    }
+
+    private static void AplicarPorcao(Genericos entity, string? porcaoTexto)
+    {
+        var porcao = PorcaoParser.Parse(porcaoTexto);
+        entity.PorcaoTexto = porcao.TextoOriginal;
+        entity.Dose = porcao.Dose;
+        entity.Unidade = porcao.Unidade;
+        entity.Porcao = porcao.Quantidade;
     }
 }
