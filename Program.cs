@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Nutra.Data;
+using Nutra.Enum;
 using Nutra.Helper;
 using Nutra.Interfaces;
 using Nutra.Middleware;
@@ -18,19 +18,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-// ==================================================================
-// DATA PROTECTION - Persistência de chaves para cookies sobreviverem restarts
-// ==================================================================
-builder.Services.AddDataProtection()
-    .PersistKeysToFileSystem(new DirectoryInfo("/app/keys"))
-    .SetApplicationName("nutra-api");
-
 var myNextAppPolicy = "_myNextAppPolicy";
 
 var authSettings = builder.Configuration.GetSection("Authentication");
-var authority = authSettings["Authority"];
-var clientId = authSettings["ClientId"];
-var clientSecret = authSettings["ClientSecret"];
+var authority = authSettings["Authority"] ?? throw new InvalidOperationException("Authentication:Authority não configurado.");
+var audience = authSettings["Audience"] ?? throw new InvalidOperationException("Authentication:Audience não configurado.");
 
 var connectionString = builder.Configuration
     ["ConnectionStrings:DefaultConnection"];
@@ -38,7 +30,7 @@ var connectionString = builder.Configuration
 builder.Services.AddDbContextFactory<AlimentosContext>(options =>
     options.UseNpgsql(connectionString));
 
-builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+builder.Services.AddIdentityCore<ApplicationUser>(options =>
 {
     options.User.RequireUniqueEmail = true;
     options.SignIn.RequireConfirmedAccount = false;
@@ -47,49 +39,24 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<AlimentosContext>()
 .AddDefaultTokenProviders();
 
-builder.Services.ConfigureApplicationCookie(options =>
-{
-    options.Cookie.Name = "Nutra.Identity";
-    // SameSite=None permite cookies cross-site (necessário quando frontend e backend estão em portas diferentes)
-    // Secure é obrigatório para SameSite=None
-    options.Cookie.SameSite = SameSiteMode.None;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.Cookie.HttpOnly = true;
-
-    options.Events.OnRedirectToLogin = context =>
-    {
-        if (context.Request.Path.StartsWithSegments("/api"))
-        {
-            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-            return Task.CompletedTask;
-        }
-        context.Response.Redirect(context.RedirectUri);
-        return Task.CompletedTask;
-    };
-});
-
-builder.Services.ConfigureExternalCookie(options =>
-{
-    options.Cookie.SameSite = SameSiteMode.None;
-    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-});
-
 builder.Services.AddAuthentication(options =>
 {
-    // Usar Bearer como padrão para APIs que recebem tokens JWT via Authorization header
-    options.DefaultScheme = "Bearer";
+    options.DefaultAuthenticateScheme = "Bearer";
     options.DefaultChallengeScheme = "Bearer";
+    options.DefaultScheme = "Bearer";
 })
 .AddJwtBearer("Bearer", options =>
 {
     options.Authority = authority;
-    options.RequireHttpsMetadata = false; // Dev only - mudar para true em produção
+    options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+    options.MapInboundClaims = false;
 
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
         ValidIssuer = authority,
-        ValidateAudience = false, // Desabilitado: token não inclui 'aud' claim
+        ValidateAudience = true,
+        ValidAudience = audience,
         ValidateLifetime = true,
         NameClaimType = "name",
         RoleClaimType = "role",
@@ -119,204 +86,32 @@ builder.Services.AddAuthentication(options =>
             var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
             
-            // Log all claims for debugging
             if (context.Principal?.Identity is ClaimsIdentity identity)
             {
-                logger.LogInformation($"[NutraFoodApi JWT] Claims no token:");
-                foreach (var claim in identity.Claims)
-                {
-                    logger.LogInformation($"  - {claim.Type}: {claim.Value}");
-                }
-                
-                var userId = context.Principal?.FindFirst("sub")?.Value ?? 
-                            context.Principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? 
-                            context.Principal?.FindFirst("client_id")?.Value ?? 
-                            "UNKNOWN";
-                
-                logger.LogInformation($"[NutraFoodApi JWT] IsAuthenticated: {context.Principal?.Identity?.IsAuthenticated}");
-                logger.LogInformation($"[NutraFoodApi JWT] AuthenticationType: {context.Principal?.Identity?.AuthenticationType}");
-                logger.LogInformation($"[NutraFoodApi JWT] UserId (web-auth): {userId}");
+                var userId = context.Principal?.FindFirst("sub")?.Value
+                    ?? context.Principal?.FindFirst("client_id")?.Value
+                    ?? "UNKNOWN";
                 
                 authLogger.LogOpenIdEvent("JWT-TOKEN-VALIDATED", $"Bearer token validado", userId);
 
-                // Resolve the local NutraApi user ID from the email claim and replace
-                // the web-auth sub so all controllers receive the correct local GUID.
-                var email = context.Principal?.FindFirst(ClaimTypes.Email)?.Value
-                         ?? context.Principal?.FindFirst("email")?.Value;
+                var userManager = context.HttpContext.RequestServices
+                    .GetRequiredService<UserManager<ApplicationUser>>();
 
-                if (!string.IsNullOrEmpty(email))
+                var localUser = await EnsureLocalUserProjectionAsync(context.Principal!, userManager, logger);
+
+                var existing = identity.FindFirst(ClaimTypes.NameIdentifier);
+                if (existing != null)
                 {
-                    var userManager = context.HttpContext.RequestServices
-                        .GetRequiredService<UserManager<ApplicationUser>>();
-                    var localUser = await userManager.FindByEmailAsync(email);
-                    if (localUser != null)
-                    {
-                        var existing = identity.FindFirst(ClaimTypes.NameIdentifier);
-                        if (existing != null)
-                            identity.RemoveClaim(existing);
-                        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, localUser.Id));
-                        logger.LogInformation($"[NutraFoodApi JWT] Resolved local NutraApi userId: {localUser.Id}");
-                    }
+                    identity.RemoveClaim(existing);
                 }
+
+                identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, localUser.Id));
+                identity.AddClaim(new Claim("local_user_id", localUser.Id));
             }
             else
             {
                 logger.LogWarning("[NutraFoodApi JWT] Principal ou Identity é nulo!");
             }
-        }
-    };
-})
-.AddOpenIdConnect("OpenIdConnect", options =>
-{
-    options.Authority = authority;
-    options.ClientId = clientId;
-    options.ClientSecret = clientSecret;
-    options.ResponseType = "code";
-    options.SignInScheme = IdentityConstants.ApplicationScheme;
-
-    // CallbackPath é relativo ao PathBase - NÃO incluir /nutra-api aqui
-    // PathBase(/nutra-api) + CallbackPath(/signin-oidc) = /nutra-api/signin-oidc
-    options.CallbackPath = "/signin-oidc";
-    options.SignedOutCallbackPath = "/signout-callback-oidc";
-
-    options.SaveTokens = true;
-    options.GetClaimsFromUserInfoEndpoint = true;
-
-    // Configura��es para Desenvolvimento Local (Ignorar erro de SSL)
-    options.RequireHttpsMetadata = false;
-    options.BackchannelHttpHandler = new HttpClientHandler
-    {
-        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    };
-
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        NameClaimType = "name",
-        RoleClaimType = "role",
-        ValidateIssuer = true,
-        ValidIssuer = authority
-    };
-
-    // Escopos que vamos pedir ao Autenticador
-    options.Scope.Clear();
-    options.Scope.Add("openid");
-    options.Scope.Add("profile");
-    options.Scope.Add("email");
-    options.Scope.Add("offline_access");
-
-    options.Events = new Microsoft.AspNetCore.Authentication.OpenIdConnect.OpenIdConnectEvents
-    {
-        OnTokenValidated = async context =>
-        {
-            var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            var userIdExternal = context.Principal.FindFirst("sub")?.Value ?? "UNKNOWN";
-            
-            authLogger.LogOpenIdEvent("TOKEN-VALIDATED", $"Token recebido do servidor OpenID", userIdExternal);
-            logger.LogInformation($"[NutraFoodApi] Token validado. ExternalId: {userIdExternal}");
-            
-            var userManager = context.HttpContext.RequestServices.GetRequiredService<UserManager<ApplicationUser>>();
-            var signInManager = context.HttpContext.RequestServices.GetRequiredService<SignInManager<ApplicationUser>>();
-
-            var userEmail = context.Principal.FindFirst("email")?.Value;
-            var userName = context.Principal.FindFirst("name")?.Value ?? userEmail;
-
-            authLogger.LogAuthStep("EMAIL-EXTRACTION", $"Email: {userEmail}, Nome: {userName}", userIdExternal);
-            logger.LogInformation($"[NutraFoodApi] Email extraído: {userEmail}, Nome: {userName}");
-
-            if (!string.IsNullOrEmpty(userEmail))
-            {
-                var user = await userManager.FindByEmailAsync(userEmail);
-
-                if (user == null)
-                {
-                    authLogger.LogAuthStep("USER-CREATE", $"Usuário não encontrado. Criando novo usuário para email: {userEmail}", userIdExternal);
-                    logger.LogInformation($"[NutraFoodApi] Criando novo usuário para {userEmail}");
-                    
-                    user = new ApplicationUser
-                    {
-                        UserName = userEmail,
-                        Email = userEmail,
-                        NomeCompleto = userName,
-                        CPF = "",
-                        EmailConfirmed = true,
-                        SecurityStamp = Guid.NewGuid().ToString()
-                    };
-                    var createResult = await userManager.CreateAsync(user);
-                    
-                    authLogger.LogAuthStep("USER-CREATED", $"Status: {(createResult.Succeeded ? "Sucesso" : "Falha")}, Erros: {string.Join(", ", createResult.Errors.Select(e => e.Description))}", userIdExternal);
-                    logger.LogInformation($"[NutraFoodApi] Usuário criado: {(createResult.Succeeded ? "Sucesso" : "Falha")}");
-                }
-                else
-                {
-                    authLogger.LogAuthStep("USER-FOUND", $"Usuário encontrado no banco de dados", userIdExternal);
-                    logger.LogInformation($"[NutraFoodApi] Usuário encontrado: {userEmail}");
-                }
-
-                var principal = await signInManager.CreateUserPrincipalAsync(user);
-                context.Principal = principal;
-                
-                authLogger.LogAuthStep("PRINCIPAL-CREATED", $"Principal criado para usuário {user.Email}", userIdExternal);
-                logger.LogInformation($"[NutraFoodApi] Principal criado para {user.Email}");
-            }
-            else
-            {
-                authLogger.LogWarning("TOKEN-VALIDATION", "Email não encontrado no token", userIdExternal);
-                logger.LogWarning($"[NutraFoodApi] Email não encontrado no token");
-            }
-        },
-
-        OnRedirectToIdentityProvider = context =>
-        {
-            var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            var userId = context.HttpContext.User?.FindFirst("sub")?.Value ?? "ANONYMOUS";
-            
-            var redirectUri = context.ProtocolMessage.RedirectUri;
-            var clientId = context.ProtocolMessage.ClientId;
-            var scope = context.ProtocolMessage.Scope;
-            
-            authLogger.LogAuthStep("REDIRECT-TO-PROVIDER", $"RedirectUri: {redirectUri}, ClientId: {clientId}, Scope: {scope}", userId);
-            logger.LogInformation("[NutraFoodApi] Redirecionando para provedor OpenID. ClientId: {ClientId}, RedirectUri: {RedirectUri}", clientId, redirectUri);
-            
-            if (context.Request.Path.StartsWithSegments("/api") &&
-               !context.Request.Path.StartsWithSegments("/api/Auth/login"))
-            {
-                authLogger.LogWarning("REDIRECT-BLOCKED", $"Redirecionamento bloqueado para path: {context.Request.Path}", userId);
-                logger.LogWarning("[NutraFoodApi] Redirecionamento bloqueado para {Path}", context.Request.Path);
-                
-                context.Response.StatusCode = StatusCodes.Status401Unauthorized;
-                context.HandleResponse();
-            }
-            return Task.CompletedTask;
-        },
-        
-        OnAuthenticationFailed = context =>
-        {
-            var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            var userId = context.HttpContext.User?.FindFirst("sub")?.Value ?? "ANONYMOUS";
-            
-            authLogger.LogException("AUTH-FAILED-EVENT", context.Exception, userId);
-            logger.LogError(context.Exception, $"[NutraFoodApi] Falha na autenticação OIDC: {context.Exception.Message}");
-            
-            context.HandleResponse();
-            context.Response.Redirect("/?auth_error=session_expired");
-            return Task.CompletedTask;
-        },
-        
-        OnRemoteFailure = context =>
-        {
-            var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            var userId = context.HttpContext.User?.FindFirst("sub")?.Value ?? "ANONYMOUS";
-            
-            authLogger.LogWarning("REMOTE-FAILURE", $"Erro remoto: {context.Failure?.Message}", userId);
-            logger.LogError($"[NutraFoodApi] Falha remota: {context.Failure?.Message}");
-            
-            context.HandleResponse();
-            context.Response.Redirect("/?auth_error=remote_failure");
-            return Task.CompletedTask;
         }
     };
 });
@@ -325,11 +120,13 @@ builder.Services.AddAuthentication(options =>
 // AUTORIZAÇÃO: Configura política padrão que requer qualquer usuário autenticado
 builder.Services.AddAuthorization(options =>
 {
-    // Política padrão: usuário deve estar autenticado via qualquer esquema
-    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+    var bearerPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
-        .AddAuthenticationSchemes("Bearer", "OpenIdConnect")
+        .AddAuthenticationSchemes("Bearer")
         .Build();
+
+    options.DefaultPolicy = bearerPolicy;
+    options.FallbackPolicy = bearerPolicy;
 });
 
 
@@ -342,8 +139,7 @@ builder.Services.AddCors(options =>
         policy => policy
             .WithOrigins(frontendUrl)
             .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials());
+            .AllowAnyMethod());
 });
 
 
@@ -508,3 +304,115 @@ using (var seedScope = app.Services.CreateScope())
 }
 
 app.Run();
+
+static async Task<ApplicationUser> EnsureLocalUserProjectionAsync(
+   ClaimsPrincipal principal,
+   UserManager<ApplicationUser> userManager,
+   ILogger logger)
+{
+   var subject = principal.FindFirstValue("sub");
+   var email = principal.FindFirstValue("email");
+   var displayName = principal.FindFirstValue("name")
+       ?? principal.FindFirstValue(ClaimTypes.Name)
+       ?? email
+       ?? subject
+       ?? "Usuário";
+
+   if (string.IsNullOrWhiteSpace(email))
+   {
+       if (string.IsNullOrWhiteSpace(subject))
+       {
+           throw new SecurityTokenValidationException("Token não contém nem email nem sub.");
+       }
+
+       email = $"{subject}@sso.local";
+   }
+
+   var roles = principal.FindAll("role")
+       .Select(claim => claim.Value)
+       .Where(value => !string.IsNullOrWhiteSpace(value))
+       .Distinct(StringComparer.OrdinalIgnoreCase)
+       .ToArray();
+
+   var resolvedRole = ResolvePrimaryRole(roles);
+   var user = await userManager.FindByEmailAsync(email);
+
+   if (user == null)
+   {
+       user = new ApplicationUser
+       {
+           UserName = email,
+           Email = email,
+           NomeCompleto = displayName,
+           CPF = string.Empty,
+           Role = resolvedRole,
+           EmailConfirmed = true,
+           SecurityStamp = Guid.NewGuid().ToString()
+       };
+
+       var createResult = await userManager.CreateAsync(user);
+       if (!createResult.Succeeded)
+       {
+           var errors = string.Join(", ", createResult.Errors.Select(error => error.Description));
+           throw new SecurityTokenValidationException($"Falha ao criar projeção local do usuário: {errors}");
+       }
+
+       logger.LogInformation("[NutraFoodApi JWT] Usuário local criado para {Email}", email);
+   }
+   else
+   {
+       var dirty = false;
+
+       if (!string.Equals(user.NomeCompleto, displayName, StringComparison.Ordinal))
+       {
+           user.NomeCompleto = displayName;
+           dirty = true;
+       }
+
+       if (user.Role != resolvedRole)
+       {
+           user.Role = resolvedRole;
+           dirty = true;
+       }
+
+       if (dirty)
+       {
+           user.AtualizadoEm = DateTime.UtcNow;
+           await userManager.UpdateAsync(user);
+       }
+   }
+
+   var currentRoles = await userManager.GetRolesAsync(user);
+   var targetRoles = roles.Length > 0 ? roles : [resolvedRole.ToString()];
+   var rolesToRemove = currentRoles.Except(targetRoles, StringComparer.OrdinalIgnoreCase).ToArray();
+   var rolesToAdd = targetRoles.Except(currentRoles, StringComparer.OrdinalIgnoreCase).ToArray();
+
+   if (rolesToRemove.Length > 0)
+   {
+       await userManager.RemoveFromRolesAsync(user, rolesToRemove);
+   }
+
+   if (rolesToAdd.Length > 0)
+   {
+       await userManager.AddToRolesAsync(user, rolesToAdd);
+   }
+
+   return user;
+}
+
+static ETipoRole ResolvePrimaryRole(IEnumerable<string> roles)
+{
+    var roleSet = new HashSet<string>(roles, StringComparer.OrdinalIgnoreCase);
+
+    if (roleSet.Contains("Admin"))
+    {
+        return ETipoRole.Admin;
+    }
+
+    if (roleSet.Contains("Nutricionista"))
+    {
+        return ETipoRole.Nutricionista;
+    }
+
+    return ETipoRole.Paciente;
+}

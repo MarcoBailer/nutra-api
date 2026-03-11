@@ -39,42 +39,12 @@ public class AccountsController : ControllerBase
     [HttpGet("me")]
     public async Task<IActionResult> GetMyProfile()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-        var userEmail = User.FindFirstValue(ClaimTypes.Email) ?? User.FindFirstValue("email");
-        var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.FindFirstValue("name");
-
-        // Se não houver email, usa o sub (subject) como identificador único
-        if (string.IsNullOrEmpty(userEmail))
-        {
-            if (string.IsNullOrEmpty(userId))
-            {
-                return Unauthorized("Token inválido: Nem email nem sub encontrados nas claims.");
-            }
-            
-            // Usa o sub como email temporário
-            userEmail = $"{userId}@sso.local";
-        }
-
-        var user = await _userManager.FindByEmailAsync(userEmail);
+        var userId = GetUserId();
+        var user = await _userManager.FindByIdAsync(userId);
 
         if (user == null)
         {
-            user = new ApplicationUser
-            {
-                UserName = userEmail,
-                Email = userEmail,
-                NomeCompleto = userName ?? "Usuário Novo",
-                CPF = "",
-                Role = ETipoRole.Paciente,
-                EmailConfirmed = true,
-                SecurityStamp = Guid.NewGuid().ToString()
-            };
-
-            var createResult = await _userManager.CreateAsync(user);
-            if (!createResult.Succeeded)
-            {
-                return BadRequest("Erro ao sincronizar usuário no banco local.");
-            }
+            return Unauthorized("Usuário autenticado não possui projeção local na NutraApi.");
         }
 
         return Ok(new
