@@ -4,10 +4,15 @@ using System.ComponentModel.DataAnnotations;
 
 namespace Nutra.Models.Usuario;
 
-public class ApplicationUser : IdentityUser
+public class ApplicationUser
 {
+    public Guid Id { get; set; } = Guid.NewGuid();
     [MaxLength(200)]
     public string NomeCompleto { get; set; } = string.Empty;
+
+    [MaxLength(100)]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
 
     [MaxLength(14)] // 000.000.000-00
     public string CPF { get; set; } = string.Empty;

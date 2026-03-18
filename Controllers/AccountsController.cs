@@ -1,5 +1,4 @@
 ﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Nutra.Enum;
 using Nutra.Interfaces;
@@ -15,16 +14,16 @@ namespace Nutra.Controllers;
 [Route("api/[controller]")]
 public class AccountsController : ControllerBase
 {
-    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IApplicationUserService _applicationUserService;
     private readonly IAccounts _accounts;
     private readonly INutricionista _nutricionista;
 
     public AccountsController(
-        UserManager<ApplicationUser> userManager,
+        IApplicationUserService applicationUserService,
         IAccounts accounts,
         INutricionista nutricionista)
     {
-        _userManager = userManager;
+        _applicationUserService = applicationUserService;
         _accounts = accounts;
         _nutricionista = nutricionista;
     }
@@ -40,7 +39,7 @@ public class AccountsController : ControllerBase
     public async Task<IActionResult> GetMyProfile()
     {
         var userId = GetUserId();
-        var user = await _userManager.FindByIdAsync(userId);
+        var user = await _applicationUserService.FindByIdAsync(userId);
 
         if (user == null)
         {

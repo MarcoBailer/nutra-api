@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Helper;
@@ -13,18 +12,18 @@ namespace Nutra.Services;
 
 public class UserProfileService : IUserProfile
 {
-    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IApplicationUserService _applicationUserService;
     private readonly ICalculadoraNutricional _calculadora;
     private readonly IBusca _busca;
     private readonly AlimentosContext _context;
 
-    public UserProfileService(UserManager<ApplicationUser> userManager,
+    public UserProfileService(IApplicationUserService applicationUserService,
         AlimentosContext context,
         ICalculadoraNutricional calculadora,
         IBusca busca
         )
     {
-        _userManager = userManager;
+        _applicationUserService = applicationUserService;
         _context = context;
         _calculadora = calculadora;
         _busca = busca;
@@ -38,7 +37,7 @@ public class UserProfileService : IUserProfile
 
         try
         {
-            var user = await _userManager.FindByEmailAsync(perfil.UserEmail);
+            var user = await _applicationUserService.FindByEmailAsync(perfil.UserEmail);
             if (user == null)
                 throw new Exception("Usuário não encontrado.");
 
@@ -326,7 +325,7 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao> PostRegistroBiometrico(string userId, RegistroBiometricoDto registroBiometricoDto)
     {
-        var user = await _userManager.FindByIdAsync(userId);
+        var user = await _applicationUserService.FindByIdAsync(userId);
         if (user == null)
             throw new Exception("Usuário não encontrado.");
 

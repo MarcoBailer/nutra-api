@@ -173,6 +173,7 @@ builder.Services.AddSwaggerGen(options =>
 
 builder.Services.AddScoped<IBusca, BuscaService>();
 builder.Services.AddScoped<ICalculadoraNutricional, CalculadoraNutricionalService>();
+builder.Services.AddScoped<IApplicationUserService, ApplicationUserService>();
 builder.Services.AddScoped<IUserProfile, UserProfileService>();
 builder.Services.AddScoped<IAccounts, AccountsService>();
 builder.Services.AddScoped<INutricionista, NutricionistaService>();

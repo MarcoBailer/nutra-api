@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Nutra.Data;
 using Nutra.Enum;
@@ -11,16 +10,16 @@ namespace Nutra.Services;
 
 public class NutricionistaService : INutricionista
 {
-    private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IApplicationUserService _applicationUserService;
     private readonly AlimentosContext _context;
     private readonly ILogger<NutricionistaService> _logger;
 
     public NutricionistaService(
-        UserManager<ApplicationUser> userManager,
+        IApplicationUserService applicationUserService,
         AlimentosContext context,
         ILogger<NutricionistaService> logger)
     {
-        _userManager = userManager;
+        _applicationUserService = applicationUserService;
         _context = context;
         _logger = logger;
     }
@@ -32,23 +31,20 @@ public class NutricionistaService : INutricionista
         var retorno = new RetornoPadrao();
 
         // Verifica se já existe user com esse e-mail
-        var user = await _userManager.FindByEmailAsync(dto.Email);
+        var user = await _applicationUserService.FindByEmailAsync(dto.Email);
 
         if (user == null)
         {
             user = new ApplicationUser
             {
-                UserName = dto.Email,
                 Email = dto.Email,
                 NomeCompleto = dto.NomeCompleto,
                 CPF = dto.CPF,
                 Telefone = dto.Telefone,
                 Role = ETipoRole.Nutricionista,
-                EmailConfirmed = true,
-                SecurityStamp = Guid.NewGuid().ToString()
             };
 
-            var createResult = await _userManager.CreateAsync(user);
+            var createResult = await _applicationUserService.CreateAsync(user);
             if (!createResult.Succeeded)
             {
                 retorno.Sucesso = false;
@@ -73,7 +69,7 @@ public class NutricionistaService : INutricionista
             user.NomeCompleto = dto.NomeCompleto;
             user.CPF = dto.CPF;
             user.Telefone = dto.Telefone;
-            await _userManager.UpdateAsync(user);
+            await _applicationUserService.UpdateAsync(user);
         }
 
         // Verifica unicidade do CRN
@@ -113,7 +109,7 @@ public class NutricionistaService : INutricionista
         await _context.SaveChangesAsync();
 
         // Adiciona role no Identity
-        await _userManager.AddToRoleAsync(user, "Nutricionista");
+        await _applicationUserService.AddToRoleAsync(user, "Nutricionista");
 
         retorno.Sucesso = true;
         retorno.Mensagem = "Perfil profissional cadastrado com sucesso.";
@@ -343,7 +339,7 @@ public class NutricionistaService : INutricionista
         }
 
         // Busca o paciente pelo e-mail
-        var paciente = await _userManager.FindByEmailAsync(dto.EmailPaciente);
+        var paciente = await _applicationUserService.FindByEmailAsync(dto.EmailPaciente);
         if (paciente == null)
         {
             retorno.Sucesso = false;

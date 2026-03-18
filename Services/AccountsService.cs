@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Nutra.Interfaces;
+﻿using Nutra.Interfaces;
 using Nutra.Models;
 using Nutra.Models.Dtos;
 using Nutra.Models.Dtos.Registro;
@@ -9,20 +8,18 @@ namespace Nutra.Services
 {
     public class AccountsService : IAccounts
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IConfiguration _configuration;
+        private readonly IApplicationUserService _applicationUserService;
 
-        public AccountsService(UserManager<ApplicationUser> userManager, IConfiguration configuration)
+        public AccountsService(IApplicationUserService applicationUserService)
         {
-            _userManager = userManager;
-            _configuration = configuration;
+            _applicationUserService = applicationUserService;
         }
 
         public async Task<RetornoPadrao> AtualizarPerfilAsync(string userId, UpdateProfileDto dto)
         {
             var retorno = new RetornoPadrao();
 
-            var user = await _userManager.FindByIdAsync(userId);
+            var user = await _applicationUserService.FindByIdAsync(userId);
             if (user == null)
             {
                 retorno.Sucesso = false;
@@ -45,12 +42,12 @@ namespace Nutra.Services
 
             user.AtualizadoEm = DateTime.UtcNow;
 
-            var result = await _userManager.UpdateAsync(user);
+            var updated = await _applicationUserService.UpdateAsync(user);
 
-            if (!result.Succeeded)
+            if (!updated)
             {
                 retorno.Sucesso = false;
-                retorno.Mensagem = "Erro ao atualizar: " + string.Join("; ", result.Errors.Select(e => e.Description));
+                retorno.Mensagem = "Erro ao atualizar: usuário não encontrado.";
                 return retorno;
             }
 
@@ -63,7 +60,7 @@ namespace Nutra.Services
         {
             var retorno = new RetornoPadrao();
 
-            var user = await _userManager.FindByIdAsync(userId);
+            var user = await _applicationUserService.FindByIdAsync(userId);
             if (user == null)
             {
                 retorno.Sucesso = false;
@@ -74,10 +71,10 @@ namespace Nutra.Services
             user.Ativo = false;
             user.AtualizadoEm = DateTime.UtcNow;
 
-            var result = await _userManager.UpdateAsync(user);
+            var updated = await _applicationUserService.UpdateAsync(user);
 
-            retorno.Sucesso = result.Succeeded;
-            retorno.Mensagem = result.Succeeded ? "Conta desativada com sucesso." : "Erro ao desativar conta.";
+            retorno.Sucesso = updated;
+            retorno.Mensagem = updated ? "Conta desativada com sucesso." : "Erro ao desativar conta.";
             return retorno;
         }
 
@@ -85,7 +82,7 @@ namespace Nutra.Services
         {
             var retorno = new RetornoPadrao();
 
-            var user = await _userManager.FindByIdAsync(userId);
+            var user = await _applicationUserService.FindByIdAsync(userId);
             if (user == null)
             {
                 retorno.Sucesso = false;
@@ -96,10 +93,10 @@ namespace Nutra.Services
             user.Ativo = true;
             user.AtualizadoEm = DateTime.UtcNow;
 
-            var result = await _userManager.UpdateAsync(user);
+            var updated = await _applicationUserService.UpdateAsync(user);
 
-            retorno.Sucesso = result.Succeeded;
-            retorno.Mensagem = result.Succeeded ? "Conta reativada com sucesso." : "Erro ao reativar conta.";
+            retorno.Sucesso = updated;
+            retorno.Mensagem = updated ? "Conta reativada com sucesso." : "Erro ao reativar conta.";
             return retorno;
         }
     }

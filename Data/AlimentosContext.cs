@@ -1,17 +1,19 @@
-﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Nutra.Models.Alimentos;
 using Nutra.Models.RegraNutricional;
 using Nutra.Models.Usuario;
 
 namespace Nutra.Data;
 
-public class AlimentosContext : IdentityDbContext<ApplicationUser>
+public class AlimentosContext : DbContext
 {
     public AlimentosContext(DbContextOptions<AlimentosContext> options)
         : base(options)
     {
     }
+
+    // --- Usuários (domínio local) ---
+    public DbSet<ApplicationUser> ApplicationUsers { get; set; }
 
     // --- Alimentos ---
     public DbSet<Fabricantes> Fabricantes { get; set; }
