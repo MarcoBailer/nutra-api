@@ -41,16 +41,9 @@ public class NutricionistaService : INutricionista
                 NomeCompleto = dto.NomeCompleto,
                 CPF = dto.CPF,
                 Telefone = dto.Telefone,
-                Role = ETipoRole.Nutricionista,
             };
 
-            var createResult = await _applicationUserService.CreateAsync(user);
-            if (!createResult.Succeeded)
-            {
-                retorno.Sucesso = false;
-                retorno.Mensagem = "Erro ao criar conta: " + string.Join("; ", createResult.Errors.Select(e => e.Description));
-                return retorno;
-            }
+            await _applicationUserService.CreateAsync(user);
         }
         else
         {
@@ -65,7 +58,6 @@ public class NutricionistaService : INutricionista
                 return retorno;
             }
 
-            user.Role = ETipoRole.Nutricionista;
             user.NomeCompleto = dto.NomeCompleto;
             user.CPF = dto.CPF;
             user.Telefone = dto.Telefone;
@@ -107,9 +99,6 @@ public class NutricionistaService : INutricionista
         _context.PerfisProfissionais.Add(perfilProfissional);
         _context.Assinaturas.Add(assinatura);
         await _context.SaveChangesAsync();
-
-        // Adiciona role no Identity
-        await _applicationUserService.AddToRoleAsync(user, "Nutricionista");
 
         retorno.Sucesso = true;
         retorno.Mensagem = "Perfil profissional cadastrado com sucesso.";

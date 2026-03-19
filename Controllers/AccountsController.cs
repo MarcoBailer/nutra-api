@@ -1,10 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Nutra.Enum;
 using Nutra.Interfaces;
 using Nutra.Models.Dtos;
-using Nutra.Models.Dtos.Registro;
-using Nutra.Models.Usuario;
 using System.Security.Claims;
 
 namespace Nutra.Controllers;
@@ -52,7 +49,7 @@ public class AccountsController : ControllerBase
             user.NomeCompleto,
             user.Email,
             user.CPF,
-            user.Role,
+            Roles = User.FindAll("role").Select(c => c.Value).ToArray(),
             user.DataNascimento,
             user.Telefone,
             user.FotoPerfilUrl,

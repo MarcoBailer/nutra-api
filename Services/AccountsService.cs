@@ -1,8 +1,6 @@
 ﻿using Nutra.Interfaces;
 using Nutra.Models;
 using Nutra.Models.Dtos;
-using Nutra.Models.Dtos.Registro;
-using Nutra.Models.Usuario;
 
 namespace Nutra.Services
 {

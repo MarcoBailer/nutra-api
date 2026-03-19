@@ -16,19 +16,21 @@ public class ApplicationUserService : IApplicationUserService
 
     public async Task<ApplicationUser?> FindByIdAsync(string userId)
     {
-        if (!Guid.TryParse(userId, out var parsedUserId))
-        {
-            return null;
-        }
-
         return await _context.ApplicationUsers
-            .FirstOrDefaultAsync(user => user.Id == parsedUserId);
+            .FirstOrDefaultAsync(user => user.Id == userId);
     }
 
     public async Task<ApplicationUser?> FindByEmailAsync(string email)
     {
         return await _context.ApplicationUsers
             .FirstOrDefaultAsync(user => user.Email == email);
+    }
+
+    public async Task<ApplicationUser> CreateAsync(ApplicationUser user)
+    {
+        _context.ApplicationUsers.Add(user);
+        await _context.SaveChangesAsync();
+        return user;
     }
 
     public async Task<bool> UpdateAsync(ApplicationUser user)
@@ -45,10 +47,5 @@ public class ApplicationUserService : IApplicationUserService
         await _context.SaveChangesAsync();
 
         return true;
-    }
-
-    public Task CreateAsync(ApplicationUser user)
-    {
-        throw new NotImplementedException("CreateAsync ainda não foi implementado. Defina se a criação será local ou delegada ao serviço de autenticação.");
     }
 }

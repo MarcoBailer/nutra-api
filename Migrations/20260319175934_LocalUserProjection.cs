@@ -4,36 +4,22 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Nutra.Migrations
+namespace nutra.api.Migrations
 {
     /// <inheritdoc />
-    public partial class postgresql : Migration
+    public partial class LocalUserProjection : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "AspNetRoles",
+                name: "ApplicationUsers",
                 columns: table => new
                 {
-                    Id = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    NormalizedName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetRoles", x => x.Id);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AspNetUsers",
-                columns: table => new
-                {
-                    Id = table.Column<string>(type: "text", nullable: false),
+                    Id = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     NomeCompleto = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Email = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     CPF = table.Column<string>(type: "character varying(14)", maxLength: 14, nullable: false),
-                    Role = table.Column<int>(type: "integer", nullable: false),
                     DataNascimento = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     Telefone = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
                     FotoPerfilUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
@@ -46,25 +32,11 @@ namespace Nutra.Migrations
                     CEP = table.Column<string>(type: "character varying(9)", maxLength: 9, nullable: true),
                     CriadoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     AtualizadoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    Ativo = table.Column<bool>(type: "boolean", nullable: false),
-                    UserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    NormalizedUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    Email = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    NormalizedEmail = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
-                    EmailConfirmed = table.Column<bool>(type: "boolean", nullable: false),
-                    PasswordHash = table.Column<string>(type: "text", nullable: true),
-                    SecurityStamp = table.Column<string>(type: "text", nullable: true),
-                    ConcurrencyStamp = table.Column<string>(type: "text", nullable: true),
-                    PhoneNumber = table.Column<string>(type: "text", nullable: true),
-                    PhoneNumberConfirmed = table.Column<bool>(type: "boolean", nullable: false),
-                    TwoFactorEnabled = table.Column<bool>(type: "boolean", nullable: false),
-                    LockoutEnd = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LockoutEnabled = table.Column<bool>(type: "boolean", nullable: false),
-                    AccessFailedCount = table.Column<int>(type: "integer", nullable: false)
+                    Ativo = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                    table.PrimaryKey("PK_ApplicationUsers", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -75,6 +47,9 @@ namespace Nutra.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Fabricante = table.Column<string>(type: "text", nullable: true),
                     Produto = table.Column<string>(type: "text", nullable: true),
+                    PorcaoTexto = table.Column<string>(type: "text", nullable: true),
+                    Unidade = table.Column<string>(type: "text", nullable: true),
+                    Dose = table.Column<string>(type: "text", nullable: true),
                     Porcao = table.Column<double>(type: "double precision", nullable: true),
                     EnergiaKcal = table.Column<double>(type: "double precision", nullable: true),
                     EnergiaKj = table.Column<double>(type: "double precision", nullable: true),
@@ -104,6 +79,9 @@ namespace Nutra.Migrations
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     Fabricante = table.Column<string>(type: "text", nullable: true),
                     Produto = table.Column<string>(type: "text", nullable: true),
+                    PorcaoTexto = table.Column<string>(type: "text", nullable: true),
+                    Unidade = table.Column<string>(type: "text", nullable: true),
+                    Dose = table.Column<string>(type: "text", nullable: true),
                     Porcao = table.Column<double>(type: "double precision", nullable: true),
                     EnergiaKcal = table.Column<double>(type: "double precision", nullable: true),
                     EnergiaKj = table.Column<double>(type: "double precision", nullable: true),
@@ -134,6 +112,9 @@ namespace Nutra.Migrations
                     CategoriaPrincipal = table.Column<string>(type: "text", nullable: true),
                     SubCategoria = table.Column<string>(type: "text", nullable: true),
                     Produto = table.Column<string>(type: "text", nullable: true),
+                    PorcaoTexto = table.Column<string>(type: "text", nullable: true),
+                    Unidade = table.Column<string>(type: "text", nullable: true),
+                    Dose = table.Column<string>(type: "text", nullable: true),
                     Porcao = table.Column<double>(type: "double precision", nullable: true),
                     EnergiaKcal = table.Column<double>(type: "double precision", nullable: true),
                     EnergiaKj = table.Column<double>(type: "double precision", nullable: true),
@@ -210,112 +191,6 @@ namespace Nutra.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "AspNetRoleClaims",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    RoleId = table.Column<string>(type: "text", nullable: false),
-                    ClaimType = table.Column<string>(type: "text", nullable: true),
-                    ClaimValue = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetRoleClaims", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_AspNetRoleClaims_AspNetRoles_RoleId",
-                        column: x => x.RoleId,
-                        principalTable: "AspNetRoles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AspNetUserClaims",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    UserId = table.Column<string>(type: "text", nullable: false),
-                    ClaimType = table.Column<string>(type: "text", nullable: true),
-                    ClaimValue = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetUserClaims", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_AspNetUserClaims_AspNetUsers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AspNetUserLogins",
-                columns: table => new
-                {
-                    LoginProvider = table.Column<string>(type: "text", nullable: false),
-                    ProviderKey = table.Column<string>(type: "text", nullable: false),
-                    ProviderDisplayName = table.Column<string>(type: "text", nullable: true),
-                    UserId = table.Column<string>(type: "text", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetUserLogins", x => new { x.LoginProvider, x.ProviderKey });
-                    table.ForeignKey(
-                        name: "FK_AspNetUserLogins_AspNetUsers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AspNetUserRoles",
-                columns: table => new
-                {
-                    UserId = table.Column<string>(type: "text", nullable: false),
-                    RoleId = table.Column<string>(type: "text", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetUserRoles", x => new { x.UserId, x.RoleId });
-                    table.ForeignKey(
-                        name: "FK_AspNetUserRoles_AspNetRoles_RoleId",
-                        column: x => x.RoleId,
-                        principalTable: "AspNetRoles",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_AspNetUserRoles_AspNetUsers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AspNetUserTokens",
-                columns: table => new
-                {
-                    UserId = table.Column<string>(type: "text", nullable: false),
-                    LoginProvider = table.Column<string>(type: "text", nullable: false),
-                    Name = table.Column<string>(type: "text", nullable: false),
-                    Value = table.Column<string>(type: "text", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AspNetUserTokens", x => new { x.UserId, x.LoginProvider, x.Name });
-                    table.ForeignKey(
-                        name: "FK_AspNetUserTokens_AspNetUsers_UserId",
-                        column: x => x.UserId,
-                        principalTable: "AspNetUsers",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "ModelosDieta",
                 columns: table => new
                 {
@@ -330,7 +205,7 @@ namespace Nutra.Migrations
                     CarboidratoBaseG = table.Column<double>(type: "double precision", nullable: false),
                     GorduraBaseG = table.Column<double>(type: "double precision", nullable: false),
                     NumeroRefeicoesDia = table.Column<int>(type: "integer", nullable: false),
-                    CriadoPorProfissionalId = table.Column<string>(type: "text", nullable: true),
+                    CriadoPorProfissionalId = table.Column<string>(type: "character varying(128)", nullable: true),
                     Publico = table.Column<bool>(type: "boolean", nullable: false),
                     Ativo = table.Column<bool>(type: "boolean", nullable: false),
                     CriadoEm = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -340,9 +215,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_ModelosDieta", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_ModelosDieta_AspNetUsers_CriadoPorProfissionalId",
+                        name: "FK_ModelosDieta_ApplicationUsers_CriadoPorProfissionalId",
                         column: x => x.CriadoPorProfissionalId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                 });
@@ -353,7 +228,7 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    UserId = table.Column<string>(type: "text", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(128)", nullable: false),
                     CRN = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     CRNRegiao = table.Column<int>(type: "integer", nullable: false),
                     Especialidade = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
@@ -372,9 +247,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_PerfisProfissionais", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_PerfisProfissionais_AspNetUsers_UserId",
+                        name: "FK_PerfisProfissionais_ApplicationUsers_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -501,7 +376,7 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    PacienteUserId = table.Column<string>(type: "text", nullable: false),
+                    PacienteUserId = table.Column<string>(type: "character varying(128)", nullable: false),
                     PerfilProfissionalId = table.Column<int>(type: "integer", nullable: false),
                     ClinicaId = table.Column<int>(type: "integer", nullable: true),
                     Status = table.Column<int>(type: "integer", nullable: false),
@@ -514,9 +389,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_VinculosPacienteProfissional", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_VinculosPacienteProfissional_AspNetUsers_PacienteUserId",
+                        name: "FK_VinculosPacienteProfissional_ApplicationUsers_PacienteUserId",
                         column: x => x.PacienteUserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -582,7 +457,7 @@ namespace Nutra.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     PerfilNutricionalId = table.Column<int>(type: "integer", nullable: false),
-                    ProfissionalResponsavelId = table.Column<string>(type: "text", nullable: true),
+                    ProfissionalResponsavelId = table.Column<string>(type: "character varying(128)", nullable: true),
                     DataAvaliacao = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Observacoes = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     PesoKg = table.Column<double>(type: "double precision", nullable: false),
@@ -646,9 +521,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_AvaliacoesAntropometricas", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_AvaliacoesAntropometricas_AspNetUsers_ProfissionalResponsav~",
+                        name: "FK_AvaliacoesAntropometricas_ApplicationUsers_ProfissionalResp~",
                         column: x => x.ProfissionalResponsavelId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                 });
@@ -683,7 +558,7 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    UserId = table.Column<string>(type: "text", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(128)", nullable: false),
                     DataRegistro = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     TipoRefeicao = table.Column<int>(type: "integer", nullable: false),
                     FotoUrl = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
@@ -695,9 +570,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_FotosRefeicao", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_FotosRefeicao_AspNetUsers_UserId",
+                        name: "FK_FotosRefeicao_ApplicationUsers_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -801,7 +676,7 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    UserId = table.Column<string>(type: "text", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(128)", nullable: false),
                     MetaNutricionalAtualId = table.Column<int>(type: "integer", nullable: true),
                     AlturaCm = table.Column<double>(type: "double precision", nullable: false),
                     PesoAtualKg = table.Column<double>(type: "double precision", nullable: false),
@@ -833,9 +708,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_PerfilNutricional", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_PerfilNutricional_AspNetUsers_UserId",
+                        name: "FK_PerfilNutricional_ApplicationUsers_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -873,7 +748,7 @@ namespace Nutra.Migrations
                     Id = table.Column<int>(type: "integer", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
                     PerfilNutricionalId = table.Column<int>(type: "integer", nullable: false),
-                    ProfissionalResponsavelId = table.Column<string>(type: "text", nullable: true),
+                    ProfissionalResponsavelId = table.Column<string>(type: "character varying(128)", nullable: true),
                     Nome = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     Descricao = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     DataInicio = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -894,9 +769,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_PlanosAlimentares", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_PlanosAlimentares_AspNetUsers_ProfissionalResponsavelId",
+                        name: "FK_PlanosAlimentares_ApplicationUsers_ProfissionalResponsavelId",
                         column: x => x.ProfissionalResponsavelId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
@@ -1012,7 +887,7 @@ namespace Nutra.Migrations
                 {
                     Id = table.Column<long>(type: "bigint", nullable: false)
                         .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    UserId = table.Column<string>(type: "text", nullable: false),
+                    UserId = table.Column<string>(type: "character varying(128)", nullable: false),
                     AlimentoIdOrigem = table.Column<int>(type: "integer", nullable: false),
                     NomeAlimentoSnapshot = table.Column<string>(type: "text", nullable: false),
                     TipoTabela = table.Column<int>(type: "integer", nullable: false),
@@ -1034,9 +909,9 @@ namespace Nutra.Migrations
                 {
                     table.PrimaryKey("PK_RegistroAlimentar", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_RegistroAlimentar_AspNetUsers_UserId",
+                        name: "FK_RegistroAlimentar_ApplicationUsers_UserId",
                         column: x => x.UserId,
-                        principalTable: "AspNetUsers",
+                        principalTable: "ApplicationUsers",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                     table.ForeignKey(
@@ -1057,43 +932,6 @@ namespace Nutra.Migrations
                 name: "IX_AnamnesesAlimentares_PerfilNutricionalId",
                 table: "AnamnesesAlimentares",
                 column: "PerfilNutricionalId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetRoleClaims_RoleId",
-                table: "AspNetRoleClaims",
-                column: "RoleId");
-
-            migrationBuilder.CreateIndex(
-                name: "RoleNameIndex",
-                table: "AspNetRoles",
-                column: "NormalizedName",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserClaims_UserId",
-                table: "AspNetUserClaims",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserLogins_UserId",
-                table: "AspNetUserLogins",
-                column: "UserId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_AspNetUserRoles_RoleId",
-                table: "AspNetUserRoles",
-                column: "RoleId");
-
-            migrationBuilder.CreateIndex(
-                name: "EmailIndex",
-                table: "AspNetUsers",
-                column: "NormalizedEmail");
-
-            migrationBuilder.CreateIndex(
-                name: "UserNameIndex",
-                table: "AspNetUsers",
-                column: "NormalizedUserName",
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Assinaturas_PerfilProfissionalId",
@@ -1321,21 +1159,6 @@ namespace Nutra.Migrations
                 name: "AnamnesesAlimentares");
 
             migrationBuilder.DropTable(
-                name: "AspNetRoleClaims");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUserClaims");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUserLogins");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUserRoles");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUserTokens");
-
-            migrationBuilder.DropTable(
                 name: "Assinaturas");
 
             migrationBuilder.DropTable(
@@ -1381,9 +1204,6 @@ namespace Nutra.Migrations
                 name: "VinculosPacienteProfissional");
 
             migrationBuilder.DropTable(
-                name: "AspNetRoles");
-
-            migrationBuilder.DropTable(
                 name: "AvaliacoesAntropometricas");
 
             migrationBuilder.DropTable(
@@ -1414,7 +1234,7 @@ namespace Nutra.Migrations
                 name: "PerfilNutricional");
 
             migrationBuilder.DropTable(
-                name: "AspNetUsers");
+                name: "ApplicationUsers");
 
             migrationBuilder.DropTable(
                 name: "MetasNutricionais");

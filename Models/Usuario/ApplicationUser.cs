@@ -1,12 +1,16 @@
-﻿using Microsoft.AspNetCore.Identity;
-using Nutra.Enum;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace Nutra.Models.Usuario;
 
+/// <summary>
+/// Projeção local do usuário autenticado pelo shark-lock.
+/// Não gerencia senha nem login — apenas dados de domínio.
+/// O Id corresponde ao "sub" claim do token JWT.
+/// </summary>
 public class ApplicationUser
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
+    [MaxLength(128)]
+    public string Id { get; set; } = string.Empty;
     [MaxLength(200)]
     public string NomeCompleto { get; set; } = string.Empty;
 
@@ -16,8 +20,6 @@ public class ApplicationUser
 
     [MaxLength(14)] // 000.000.000-00
     public string CPF { get; set; } = string.Empty;
-
-    public ETipoRole Role { get; set; } = ETipoRole.Paciente;
 
     public DateTime? DataNascimento { get; set; }
 
@@ -58,7 +60,7 @@ public class ApplicationUser
     public PerfilNutricional? PerfilAtivo { get; set; }
 
     /// <summary>
-    /// Perfil profissional (preenchido somente se Role == Nutricionista).
+    /// Perfil profissional (preenchido se o usuário é nutricionista).
     /// </summary>
     public PerfilProfissional? PerfilProfissional { get; set; }
 

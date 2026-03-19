@@ -1,10 +1,8 @@
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Nutra.Data;
-using Nutra.Enum;
 using Nutra.Helper;
 using Nutra.Interfaces;
 using Nutra.Middleware;
@@ -30,15 +28,6 @@ var connectionString = builder.Configuration
 builder.Services.AddDbContextFactory<AlimentosContext>(options =>
     options.UseNpgsql(connectionString));
 
-builder.Services.AddIdentityCore<ApplicationUser>(options =>
-{
-    options.User.RequireUniqueEmail = true;
-    options.SignIn.RequireConfirmedAccount = false;
-})
-.AddRoles<IdentityRole>()
-.AddEntityFrameworkStores<AlimentosContext>()
-.AddDefaultTokenProviders();
-
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = "Bearer";
@@ -63,11 +52,13 @@ builder.Services.AddAuthentication(options =>
         ClockSkew = TimeSpan.FromMinutes(5)
     };
 
-    // Configuração para desenvolvimento (ignorar SSL)
-    options.BackchannelHttpHandler = new HttpClientHandler
+    if (builder.Environment.IsDevelopment())
     {
-        ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-    };
+        options.BackchannelHttpHandler = new HttpClientHandler
+        {
+            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        };
+    }
 
     options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
     {
@@ -75,43 +66,47 @@ builder.Services.AddAuthentication(options =>
         {
             var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            
+
             authLogger.LogException("JWT-AUTH-FAILED", context.Exception, "ANONYMOUS");
-            logger.LogError(context.Exception, $"[NutraFoodApi JWT] Falha na validação do token: {context.Exception.Message}");
-            
+            logger.LogError(context.Exception, "[NutraFoodApi JWT] Falha na validação do token: {Message}", context.Exception.Message);
+
             return Task.CompletedTask;
         },
         OnTokenValidated = async context =>
         {
             var authLogger = context.HttpContext.RequestServices.GetRequiredService<AuthLogger>();
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            
-            if (context.Principal?.Identity is ClaimsIdentity identity)
-            {
-                var userId = context.Principal?.FindFirst("sub")?.Value
-                    ?? context.Principal?.FindFirst("client_id")?.Value
-                    ?? "UNKNOWN";
-                
-                authLogger.LogOpenIdEvent("JWT-TOKEN-VALIDATED", $"Bearer token validado", userId);
 
-                var userManager = context.HttpContext.RequestServices
-                    .GetRequiredService<UserManager<ApplicationUser>>();
-
-                var localUser = await EnsureLocalUserProjectionAsync(context.Principal!, userManager, logger);
-
-                var existing = identity.FindFirst(ClaimTypes.NameIdentifier);
-                if (existing != null)
-                {
-                    identity.RemoveClaim(existing);
-                }
-
-                identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, localUser.Id));
-                identity.AddClaim(new Claim("local_user_id", localUser.Id));
-            }
-            else
+            if (context.Principal?.Identity is not ClaimsIdentity identity)
             {
                 logger.LogWarning("[NutraFoodApi JWT] Principal ou Identity é nulo!");
+                return;
             }
+
+            var sub = context.Principal.FindFirstValue("sub")
+                   ?? context.Principal.FindFirstValue("client_id");
+
+            if (string.IsNullOrWhiteSpace(sub))
+            {
+                logger.LogWarning("[NutraFoodApi JWT] Token sem claim 'sub' ou 'client_id'.");
+                return;
+            }
+
+            authLogger.LogOpenIdEvent("JWT-TOKEN-VALIDATED", "Bearer token validado", sub);
+
+            var userService = context.HttpContext.RequestServices
+                .GetRequiredService<IApplicationUserService>();
+
+            var localUser = await EnsureLocalUserProjectionAsync(context.Principal, sub, userService, logger);
+
+            // Substitui o NameIdentifier pelo Id local (que é o próprio sub)
+            var existing = identity.FindFirst(ClaimTypes.NameIdentifier);
+            if (existing != null)
+            {
+                identity.RemoveClaim(existing);
+            }
+
+            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, localUser.Id));
         }
     };
 });
@@ -205,7 +200,7 @@ using (var migrationScope = app.Services.CreateScope())
     {
         logger.LogInformation("Verificando migrations pendentes...");
         var dbContext = services.GetRequiredService<AlimentosContext>();
-        
+
         if (dbContext.Database.GetPendingMigrations().Any())
         {
             logger.LogInformation("Aplicando migrations...");
@@ -230,7 +225,7 @@ using (var migrationScope = app.Services.CreateScope())
 // Em produção com Docker/Nginx/Tailscale, o proxy não é localhost
 var forwardedHeadersOptions = new ForwardedHeadersOptions
 {
-    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor 
+    ForwardedHeaders = Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedFor
                      | Microsoft.AspNetCore.HttpOverrides.ForwardedHeaders.XForwardedProto
 };
 forwardedHeadersOptions.KnownNetworks.Clear();
@@ -274,26 +269,6 @@ using (var seedScope = app.Services.CreateScope())
 {
     var logger = seedScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
 
-    // Seed de Roles do Identity
-    try
-    {
-        var roleManager = seedScope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        string[] roles = ["Paciente", "Nutricionista", "Admin"];
-        foreach (var role in roles)
-        {
-            if (!await roleManager.RoleExistsAsync(role))
-            {
-                await roleManager.CreateAsync(new IdentityRole(role));
-                logger.LogInformation("Role '{Role}' criada com sucesso.", role);
-            }
-        }
-    }
-    catch (Exception ex)
-    {
-        logger.LogError(ex, "Erro ao criar roles do Identity.");
-    }
-
-    // Seed de Alimentos
     try
     {
         await DatabaseSeeder.SeedAsync(app.Services, logger);
@@ -306,114 +281,59 @@ using (var seedScope = app.Services.CreateScope())
 
 app.Run();
 
+/// <summary>
+/// Garante que existe uma projeção local do usuário autenticado pelo shark-lock.
+/// Usa o "sub" do token JWT como Id local. Atualiza nome e email se mudaram.
+/// </summary>
 static async Task<ApplicationUser> EnsureLocalUserProjectionAsync(
    ClaimsPrincipal principal,
-   UserManager<ApplicationUser> userManager,
+   string sub,
+   IApplicationUserService userService,
    ILogger logger)
 {
-   var subject = principal.FindFirstValue("sub");
-   var email = principal.FindFirstValue("email");
-   var displayName = principal.FindFirstValue("name")
-       ?? principal.FindFirstValue(ClaimTypes.Name)
-       ?? email
-       ?? subject
-       ?? "Usuário";
+    var email = principal.FindFirstValue("email");
+    var displayName = principal.FindFirstValue("name")
+        ?? principal.FindFirstValue(ClaimTypes.Name)
+        ?? email
+        ?? sub;
 
-   if (string.IsNullOrWhiteSpace(email))
-   {
-       if (string.IsNullOrWhiteSpace(subject))
-       {
-           throw new SecurityTokenValidationException("Token não contém nem email nem sub.");
-       }
+    var user = await userService.FindByIdAsync(sub);
 
-       email = $"{subject}@sso.local";
-   }
-
-   var roles = principal.FindAll("role")
-       .Select(claim => claim.Value)
-       .Where(value => !string.IsNullOrWhiteSpace(value))
-       .Distinct(StringComparer.OrdinalIgnoreCase)
-       .ToArray();
-
-   var resolvedRole = ResolvePrimaryRole(roles);
-   var user = await userManager.FindByEmailAsync(email);
-
-   if (user == null)
-   {
-       user = new ApplicationUser
-       {
-           UserName = email,
-           Email = email,
-           NomeCompleto = displayName,
-           CPF = string.Empty,
-           Role = resolvedRole,
-           EmailConfirmed = true,
-           SecurityStamp = Guid.NewGuid().ToString()
-       };
-
-       var createResult = await userManager.CreateAsync(user);
-       if (!createResult.Succeeded)
-       {
-           var errors = string.Join(", ", createResult.Errors.Select(error => error.Description));
-           throw new SecurityTokenValidationException($"Falha ao criar projeção local do usuário: {errors}");
-       }
-
-       logger.LogInformation("[NutraFoodApi JWT] Usuário local criado para {Email}", email);
-   }
-   else
-   {
-       var dirty = false;
-
-       if (!string.Equals(user.NomeCompleto, displayName, StringComparison.Ordinal))
-       {
-           user.NomeCompleto = displayName;
-           dirty = true;
-       }
-
-       if (user.Role != resolvedRole)
-       {
-           user.Role = resolvedRole;
-           dirty = true;
-       }
-
-       if (dirty)
-       {
-           user.AtualizadoEm = DateTime.UtcNow;
-           await userManager.UpdateAsync(user);
-       }
-   }
-
-   var currentRoles = await userManager.GetRolesAsync(user);
-   var targetRoles = roles.Length > 0 ? roles : [resolvedRole.ToString()];
-   var rolesToRemove = currentRoles.Except(targetRoles, StringComparer.OrdinalIgnoreCase).ToArray();
-   var rolesToAdd = targetRoles.Except(currentRoles, StringComparer.OrdinalIgnoreCase).ToArray();
-
-   if (rolesToRemove.Length > 0)
-   {
-       await userManager.RemoveFromRolesAsync(user, rolesToRemove);
-   }
-
-   if (rolesToAdd.Length > 0)
-   {
-       await userManager.AddToRolesAsync(user, rolesToAdd);
-   }
-
-   return user;
-}
-
-static ETipoRole ResolvePrimaryRole(IEnumerable<string> roles)
-{
-    var roleSet = new HashSet<string>(roles, StringComparer.OrdinalIgnoreCase);
-
-    if (roleSet.Contains("Admin"))
+    if (user == null)
     {
-        return ETipoRole.Admin;
+        user = new ApplicationUser
+        {
+            Id = sub,
+            Email = email ?? $"{sub}@sso.local",
+            NomeCompleto = displayName,
+            CPF = string.Empty
+        };
+
+        await userService.CreateAsync(user);
+        logger.LogInformation("[NutraFoodApi JWT] Projeção local criada para {Sub}", sub);
+    }
+    else
+    {
+        var dirty = false;
+
+        if (!string.Equals(user.NomeCompleto, displayName, StringComparison.Ordinal))
+        {
+            user.NomeCompleto = displayName;
+            dirty = true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(email) && !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            user.Email = email;
+            dirty = true;
+        }
+
+        if (dirty)
+        {
+            user.AtualizadoEm = DateTime.UtcNow;
+            await userService.UpdateAsync(user);
+        }
     }
 
-    if (roleSet.Contains("Nutricionista"))
-    {
-        return ETipoRole.Nutricionista;
-    }
-
-    return ETipoRole.Paciente;
+    return user;
 }
