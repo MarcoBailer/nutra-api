@@ -10,13 +10,13 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copia apenas .csproj primeiro (layer de cache para restore)
-COPY ["nutra.api", "."]
-RUN dotnet restore "nutra.api"
+COPY ["nutra.api.csproj", "."]
+RUN dotnet restore "nutra.api.csproj"
 
 # Copia o restante do código-fonte
 COPY . .
 
-RUN dotnet publish "nutra.api" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "nutra.api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # ── Stage 2: Runtime ────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
