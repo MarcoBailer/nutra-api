@@ -1,0 +1,160 @@
+## ==================================================================
+## DOCKER COMPOSE - Nutra (API + Frontend + DB + Redis)
+## ==================================================================
+## Domínio nutricional completo:
+##   - nutra-api (.NET 9)
+##   - nutra-frontend (Next.js 16)
+##   - db-nutra (PostgreSQL 16)
+##   - redis (sessões NextAuth)
+##
+## Diretório no servidor: /opt/nutra/
+## Pré-requisito: docker network create app-network
+## Dependência externa: web-auth (stack auth) deve estar rodando
+## ==================================================================
+
+services:
+  # ================================================================
+  # NUTRA API - API Nutricional (.NET 9)
+  # ================================================================
+  nutra-api:
+    image: ghcr.io/${GITHUB_OWNER:-marcobailer}/nutra-api:${NUTRA_TAG:-latest}
+    container_name: nutra-api
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Host=db-nutra;Port=5432;Database=${NUTRA_DB_NAME:-nutra_db};Username=${NUTRA_DB_USER:-nutra_user};Password=${NUTRA_DB_PASSWORD:?NUTRA_DB_PASSWORD required}
+      - Authentication__Authority=${APP_BASE_URL:-http://localhost}
+      - Authentication__ClientId=${NUTRA_OAUTH_CLIENT_ID:?NUTRA_OAUTH_CLIENT_ID required}
+      - Authentication__ClientSecret=${NUTRA_OAUTH_CLIENT_SECRET:?NUTRA_OAUTH_CLIENT_SECRET required}
+      - AppSettings__BaseUrlFront=${APP_BASE_URL:-http://localhost}
+    volumes:
+      - nutra-data-protection:/app/keys
+    depends_on:
+      db-nutra:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080'"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    networks:
+      - app-network
+      - nutra-db-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
+
+  # ================================================================
+  # NUTRA FRONTEND - App Nutricional (Next.js 16)
+  # ================================================================
+  nutra-frontend:
+    image: ghcr.io/${GITHUB_OWNER:-marcobailer}/nutra-frontend:${NUTRA_FRONTEND_TAG:-latest}
+    container_name: nutra-frontend
+    restart: unless-stopped
+    environment:
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+      # NextAuth (runtime - server-side only)
+      - NEXTAUTH_URL=${APP_BASE_URL:-http://localhost}/nutra-app
+      - NEXTAUTH_SECRET=${NUTRA_FRONTEND_NEXTAUTH_SECRET:?NUTRA_FRONTEND_NEXTAUTH_SECRET required}
+      # OIDC Provider (runtime - server-side only)
+      - OIDC_ISSUER=${APP_BASE_URL:-http://localhost}
+      - OIDC_CLIENT_ID=${NUTRA_FRONTEND_OIDC_CLIENT_ID:-nutra-http}
+      - OIDC_CLIENT_SECRET=${NUTRA_FRONTEND_OIDC_CLIENT_SECRET:?NUTRA_FRONTEND_OIDC_CLIENT_SECRET required}
+      # Redis (runtime - server-side only)
+      - REDIS_URL=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-dev-password}
+      # API interna (server-side, rede Docker)
+      - NUTRA_API_URL=http://nutra-api:8080/nutra-api
+    depends_on:
+      nutra-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/nutra-app"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "1.0"
+
+  # ================================================================
+  # REDIS - Session Storage (NextAuth)
+  # ================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: redis-sessions
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis-dev-password}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  # ================================================================
+  # BANCO DE DADOS - PostgreSQL (Nutra)
+  # ================================================================
+  db-nutra:
+    image: postgres:16-alpine
+    container_name: db-nutra
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${NUTRA_DB_NAME:-nutra_db}
+      POSTGRES_USER: ${NUTRA_DB_USER:-nutra_user}
+      POSTGRES_PASSWORD: ${NUTRA_DB_PASSWORD:?NUTRA_DB_PASSWORD required}
+    volumes:
+      - nutra-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "${NUTRA_DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${NUTRA_DB_USER:-nutra_user} -d ${NUTRA_DB_NAME:-nutra_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - nutra-db-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+volumes:
+  redis-data:
+    driver: local
+  nutra-postgres-data:
+    driver: local
+  nutra-data-protection:
+    driver: local
+
+networks:
+  app-network:
+    external: true
+  nutra-db-network:
+    driver: bridge
+    internal: true
