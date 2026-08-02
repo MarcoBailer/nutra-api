@@ -26,32 +26,34 @@ public class DiarioAlimentarService : IDiarioAlimentar
     // Registro de consumo
     // ============================================================
 
-    public async Task<RegistroConsumoResultadoDto> RegistrarConsumoAsync(string userId, RegistroConsumoDto dto)
+    public async Task<RetornoPadrao<RegistroConsumoResultadoDto>> RegistrarConsumoAsync(string userId, RegistroConsumoDto dto)
     {
         var alimento = await _busca.BuscaAlimentoPorIdAsync(dto.AlimentoId, dto.TipoTabela);
         if (alimento == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Alimento não encontrado.");
+            return RetornoPadrao<RegistroConsumoResultadoDto>.NaoEncontrado("Alimento não encontrado.");
 
         var registro = CriarRegistroAlimentar(userId, alimento, dto);
         _context.RegistroAlimentar.Add(registro);
         await _context.SaveChangesAsync();
 
-        return MapearRegistro(registro);
+        return RetornoPadrao<RegistroConsumoResultadoDto>.Criado(
+            MapearRegistro(registro), "Consumo registrado com sucesso.");
     }
 
-    public async Task<List<RegistroConsumoResultadoDto>> RegistrarConsumoLoteAsync(
+    public async Task<RetornoPadrao<List<RegistroConsumoResultadoDto>>> RegistrarConsumoLoteAsync(
         string userId, RegistroConsumoLoteDto dto)
     {
         var resultados = new List<RegistroConsumoResultadoDto>();
+        var ignorados = 0;
 
         foreach (var item in dto.Itens)
         {
             var alimento = await _busca.BuscaAlimentoPorIdAsync(item.AlimentoId, item.TipoTabela);
-            if (alimento == null) continue;
+            if (alimento == null)
+            {
+                ignorados++;
+                continue;
+            }
 
             var registro = CriarRegistroAlimentar(userId, alimento, item);
             _context.RegistroAlimentar.Add(registro);
@@ -59,7 +61,14 @@ public class DiarioAlimentarService : IDiarioAlimentar
         }
 
         await _context.SaveChangesAsync();
-        return resultados;
+
+        // Itens ignorados são reportados: silenciar a truncagem faria o client
+        // acreditar que registrou tudo.
+        var mensagem = ignorados == 0
+            ? $"{resultados.Count} item(ns) registrado(s) com sucesso."
+            : $"{resultados.Count} item(ns) registrado(s). {ignorados} ignorado(s) por alimento não encontrado.";
+
+        return RetornoPadrao<List<RegistroConsumoResultadoDto>>.Criado(resultados, mensagem);
     }
 
     public async Task<RetornoPadrao> ExcluirRegistroAsync(string userId, long registroId)
@@ -67,18 +76,18 @@ public class DiarioAlimentarService : IDiarioAlimentar
         var registro = await _context.RegistroAlimentar
             .FirstOrDefaultAsync(r => r.Id == registroId && r.UserId == userId);
         if (registro == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Registro não encontrado." };
+            return RetornoPadrao.NaoEncontrado("Registro não encontrado.");
 
         _context.RegistroAlimentar.Remove(registro);
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Registro excluído com sucesso." };
+        return RetornoPadrao.Ok("Registro excluído com sucesso.");
     }
 
     // ============================================================
     // Fotos de refeição
     // ============================================================
 
-    public async Task<FotoRefeicaoResultadoDto> AdicionarFotoRefeicaoAsync(string userId, FotoRefeicaoDto dto)
+    public async Task<RetornoPadrao<FotoRefeicaoResultadoDto>> AdicionarFotoRefeicaoAsync(string userId, FotoRefeicaoDto dto)
     {
         var foto = new FotoRefeicao
         {
@@ -93,7 +102,7 @@ public class DiarioAlimentarService : IDiarioAlimentar
         _context.FotosRefeicao.Add(foto);
         await _context.SaveChangesAsync();
 
-        return new FotoRefeicaoResultadoDto
+        var resultado = new FotoRefeicaoResultadoDto
         {
             Id = foto.Id,
             TipoRefeicao = foto.TipoRefeicao,
@@ -101,6 +110,8 @@ public class DiarioAlimentarService : IDiarioAlimentar
             Descricao = foto.Descricao,
             DataRegistro = foto.DataRegistro
         };
+
+        return RetornoPadrao<FotoRefeicaoResultadoDto>.Criado(resultado, "Foto adicionada com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverFotoRefeicaoAsync(string userId, int fotoId)
@@ -108,19 +119,19 @@ public class DiarioAlimentarService : IDiarioAlimentar
         var foto = await _context.FotosRefeicao
             .FirstOrDefaultAsync(f => f.Id == fotoId && f.UserId == userId);
         if (foto == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Foto não encontrada." };
+            return RetornoPadrao.NaoEncontrado("Foto não encontrada.");
 
         _context.FotosRefeicao.Remove(foto);
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Foto removida com sucesso." };
+        return RetornoPadrao.Ok("Foto removida com sucesso.");
     }
 
-    public async Task<List<FotoRefeicaoResultadoDto>> ListarFotosDoDiaAsync(string userId, DateTime data)
+    public async Task<RetornoPadrao<List<FotoRefeicaoResultadoDto>>> ListarFotosDoDiaAsync(string userId, DateTime data)
     {
         var dataInicio = data.Date;
         var dataFim = dataInicio.AddDays(1);
 
-        return await _context.FotosRefeicao
+        var fotos = await _context.FotosRefeicao
             .Where(f => f.UserId == userId && f.DataRegistro >= dataInicio && f.DataRegistro < dataFim)
             .OrderBy(f => f.DataRegistro)
             .Select(f => new FotoRefeicaoResultadoDto
@@ -132,42 +143,57 @@ public class DiarioAlimentarService : IDiarioAlimentar
                 DataRegistro = f.DataRegistro
             })
             .ToListAsync();
+
+        return RetornoPadrao<List<FotoRefeicaoResultadoDto>>.Ok(fotos);
     }
 
     // ============================================================
     // Diário do dia (planejado vs consumido)
     // ============================================================
 
-    public async Task<DiarioDiaDto> ObterDiarioDoDiaAsync(string userId, DateTime? data = null)
+    public async Task<RetornoPadrao<DiarioDiaDto>> ObterDiarioDoDiaAsync(string userId, DateTime? data = null)
     {
         var dia = (data ?? DateTime.UtcNow).Date;
-        return await MontarDiarioDia(userId, dia);
+        return RetornoPadrao<DiarioDiaDto>.Ok(await MontarDiarioDia(userId, dia));
     }
 
-    public async Task<List<DiarioDiaDto>> ObterDiarioPorPeriodoAsync(
+    public async Task<RetornoPadrao<List<DiarioDiaDto>>> ObterDiarioPorPeriodoAsync(
         string userId, DateTime dataInicio, DateTime dataFim)
     {
+        if (dataFim.Date < dataInicio.Date)
+            return RetornoPadrao<List<DiarioDiaDto>>.Invalido("Data fim deve ser posterior à data início.");
+
+        if ((dataFim.Date - dataInicio.Date).TotalDays > 90)
+            return RetornoPadrao<List<DiarioDiaDto>>.Invalido("Período máximo de 90 dias.");
+
         var diarios = new List<DiarioDiaDto>();
         for (var dia = dataInicio.Date; dia <= dataFim.Date; dia = dia.AddDays(1))
         {
             diarios.Add(await MontarDiarioDia(userId, dia));
         }
-        return diarios;
+        return RetornoPadrao<List<DiarioDiaDto>>.Ok(diarios);
     }
 
     // ============================================================
     // Relatório de aderência
     // ============================================================
 
-    public async Task<RelatorioAdesaoDto> GerarRelatorioAdesaoAsync(
+    public async Task<RetornoPadrao<RelatorioAdesaoDto>> GerarRelatorioAdesaoAsync(
         string userId, DateTime dataInicio, DateTime dataFim)
     {
-        return await CalcularRelatorio(userId, dataInicio, dataFim);
+        if (dataFim.Date < dataInicio.Date)
+            return RetornoPadrao<RelatorioAdesaoDto>.Invalido("Data fim deve ser posterior à data início.");
+
+        return RetornoPadrao<RelatorioAdesaoDto>.Ok(
+            await CalcularRelatorio(userId, dataInicio, dataFim));
     }
 
-    public async Task<RelatorioAdesaoDto> GerarRelatorioAdesaoPacienteAsync(
+    public async Task<RetornoPadrao<RelatorioAdesaoDto>> GerarRelatorioAdesaoPacienteAsync(
         string profissionalUserId, string pacienteUserId, DateTime dataInicio, DateTime dataFim)
     {
+        if (dataFim.Date < dataInicio.Date)
+            return RetornoPadrao<RelatorioAdesaoDto>.Invalido("Data fim deve ser posterior à data início.");
+
         // Validar vínculo
         var vinculoExiste = await _context.VinculosPacienteProfissional
             .Include(v => v.Profissional)
@@ -176,13 +202,11 @@ public class DiarioAlimentarService : IDiarioAlimentar
                 v.PacienteUserId == pacienteUserId &&
                 (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente));
         if (!vinculoExiste)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Profissional não possui vínculo com este paciente.");
+            return RetornoPadrao<RelatorioAdesaoDto>.Proibido(
+                "Profissional não possui vínculo com este paciente.");
 
-        return await CalcularRelatorio(pacienteUserId, dataInicio, dataFim);
+        return RetornoPadrao<RelatorioAdesaoDto>.Ok(
+            await CalcularRelatorio(pacienteUserId, dataInicio, dataFim));
     }
 
     // ============================================================

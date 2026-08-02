@@ -23,15 +23,9 @@ public class RefeicaoService : IRefeicao
     public async Task<RetornoPadrao> RegistrarConsumoAsync(string userId, int alimentoId, ETipoTabela tabela, double quantidadeIngeridaG, ETipoRefeicao nomeRefeicao)
     {
         var alimentoInfo = await _buscaService.BuscaAlimentoPorIdAsync(alimentoId, tabela);
-        
-        var retorno = new RetornoPadrao();
 
-        if (alimentoInfo == null) 
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new Exception("Alimento não encontrado");
+        if (alimentoInfo == null)
+            return RetornoPadrao.NaoEncontrado("Alimento não encontrado.");
 
         double baseReferencia = alimentoInfo.PorcaoReferencia > 0 ? alimentoInfo.PorcaoReferencia : 100.0;
         double fator = quantidadeIngeridaG / baseReferencia;
@@ -60,12 +54,10 @@ public class RefeicaoService : IRefeicao
         _context.RegistroAlimentar.Add(novoRegistro);
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Consumo registrado com sucesso.";
-        return retorno;
+        return RetornoPadrao.Criado("Consumo registrado com sucesso.");
     }
 
-    public async Task<StatusDiarioDto?> ObterStatusDiario(string userId)
+    public async Task<RetornoPadrao<StatusDiarioDto>> ObterStatusDiario(string userId)
     {
         var hoje = DateTime.UtcNow.Date;
 
@@ -74,7 +66,8 @@ public class RefeicaoService : IRefeicao
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil?.MetaNutricional is not { } meta)
-            return null;
+            return RetornoPadrao<StatusDiarioDto>.NaoEncontrado(
+                "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
         var consumidoHoje = await _context.RegistroAlimentar
             .Where(r => r.UserId == userId && r.DataConsumo.Date == hoje)
@@ -90,7 +83,7 @@ public class RefeicaoService : IRefeicao
             })
             .FirstOrDefaultAsync();
 
-        return new StatusDiarioDto
+        var status = new StatusDiarioDto
         {
             CaloriasConsumidas   = consumidoHoje?.Calorias      ?? 0,
             ProteinasConsumidas  = consumidoHoje?.Proteinas     ?? 0,
@@ -108,5 +101,7 @@ public class RefeicaoService : IRefeicao
 
             SaldoCalorico        = meta.CaloriasDiarias - (consumidoHoje?.Calorias ?? 0),
         };
+
+        return RetornoPadrao<StatusDiarioDto>.Ok(status);
     }
 }

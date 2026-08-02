@@ -1,7 +1,9 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nutra.Enum;
 using Nutra.Interfaces;
+using Nutra.Models;
+using Nutra.Models.Dtos;
 
 namespace Nutra.Controllers;
 
@@ -17,25 +19,33 @@ public class BuscaController : ControllerBase
         _buscaService = busca;
     }
 
+    /// <summary>
+    /// IBusca não retorna envelope (é consumido internamente por outros services).
+    /// É o controller que envelopa, para o client ver o mesmo shape de sempre.
+    /// </summary>
     [HttpGet("BuscarTudo/{termo}")]
-    public async Task<ActionResult> BuscarTudo(string termo)
+    public async Task<IActionResult> BuscarTudo(string termo)
     {
         if (string.IsNullOrWhiteSpace(termo) || termo.Length < 3)
-            return BadRequest("Digite pelo menos 3 caracteres.");
+        {
+            var invalido = RetornoPadrao<List<AlimentoResumoDto>>.Invalido("Digite pelo menos 3 caracteres.");
+            return StatusCode(invalido.StatusCode, invalido);
+        }
 
-        termo = termo.ToLower();
-
-        var resultadoFinal = await _buscaService.BuscaAlimentoAsync(termo);
-
-        return Ok(resultadoFinal);
+        var alimentos = await _buscaService.BuscaAlimentoAsync(termo.ToLower());
+        var retorno = RetornoPadrao<List<AlimentoResumoDto>>.Ok(alimentos);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     [HttpGet("BuscarPorId/{id}/{tabela}")]
-    public async Task<ActionResult> BuscarPorId(int id, ETipoTabela tabela)
+    public async Task<IActionResult> BuscarPorId(int id, ETipoTabela tabela)
     {
         var alimento = await _buscaService.BuscaAlimentoPorIdAsync(id, tabela);
-        if (alimento == null)
-            return NotFound("Alimento não encontrado.");
-        return Ok(alimento);
+
+        var retorno = alimento == null
+            ? RetornoPadrao<AlimentoResumoDto>.NaoEncontrado("Alimento não encontrado.")
+            : RetornoPadrao<AlimentoResumoDto>.Ok(alimento);
+
+        return StatusCode(retorno.StatusCode, retorno);
     }
 }

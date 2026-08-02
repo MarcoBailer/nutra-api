@@ -233,6 +233,13 @@ forwardedHeadersOptions.KnownProxies.Clear();
 app.UseForwardedHeaders(forwardedHeadersOptions);
 
 // ==================================================================
+// TRATAMENTO DE EXCEÇÃO (ÚNICO PONTO DE CATCH DA API)
+// ==================================================================
+// Registrado cedo para envolver todo o pipeline. Falha de negócio é retorno
+// (RetornoPadrao); o que chega aqui é bug ou infra caída, e sai como 500.
+app.UseExceptionHandling();
+
+// ==================================================================
 // PATH BASE (usa apenas em Docker, onde a app é montada em /nutra-api/)
 // ==================================================================
 if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("DOCKER_CONTAINER")))

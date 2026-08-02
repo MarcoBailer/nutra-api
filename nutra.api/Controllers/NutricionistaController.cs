@@ -35,15 +35,8 @@ public class NutricionistaController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> Cadastrar([FromBody] CadastroNutricionistaDto dto)
     {
-        try
-        {
-            var resultado = await _nutricionista.CadastrarNutricionistaAsync(dto);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.CadastrarNutricionistaAsync(dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -52,16 +45,8 @@ public class NutricionistaController : ControllerBase
     [HttpGet("perfil")]
     public async Task<IActionResult> ObterPerfil()
     {
-        try
-        {
-            var userId = GetUserId();
-            var perfil = await _nutricionista.ObterPerfilProfissionalAsync(userId);
-            return Ok(perfil);
-        }
-        catch (Exception ex)
-        {
-            return NotFound(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.ObterPerfilProfissionalAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -70,16 +55,8 @@ public class NutricionistaController : ControllerBase
     [HttpPut("perfil")]
     public async Task<IActionResult> AtualizarPerfil([FromBody] UpdatePerfilProfissionalDto dto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.AtualizarPerfilProfissionalAsync(userId, dto);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.AtualizarPerfilProfissionalAsync(GetUserId(), dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // ===================== CLÍNICAS =====================
@@ -90,16 +67,8 @@ public class NutricionistaController : ControllerBase
     [HttpGet("clinicas")]
     public async Task<IActionResult> ListarClinicas()
     {
-        try
-        {
-            var userId = GetUserId();
-            var clinicas = await _nutricionista.ListarClinicasAsync(userId);
-            return Ok(clinicas);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.ListarClinicasAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -108,16 +77,8 @@ public class NutricionistaController : ControllerBase
     [HttpPost("clinicas")]
     public async Task<IActionResult> CriarClinica([FromBody] ClinicaDto dto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.CriarClinicaAsync(userId, dto);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.CriarClinicaAsync(GetUserId(), dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -126,16 +87,8 @@ public class NutricionistaController : ControllerBase
     [HttpPut("clinicas/{clinicaId}")]
     public async Task<IActionResult> AtualizarClinica(int clinicaId, [FromBody] ClinicaDto dto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.AtualizarClinicaAsync(userId, clinicaId, dto);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.AtualizarClinicaAsync(GetUserId(), clinicaId, dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -144,16 +97,8 @@ public class NutricionistaController : ControllerBase
     [HttpDelete("clinicas/{clinicaId}")]
     public async Task<IActionResult> RemoverClinica(int clinicaId)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.RemoverClinicaAsync(userId, clinicaId);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.RemoverClinicaAsync(GetUserId(), clinicaId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // ===================== GESTÃO DE PACIENTES =====================
@@ -164,16 +109,8 @@ public class NutricionistaController : ControllerBase
     [HttpGet("pacientes")]
     public async Task<IActionResult> ListarPacientes()
     {
-        try
-        {
-            var userId = GetUserId();
-            var pacientes = await _nutricionista.ListarPacientesAsync(userId);
-            return Ok(pacientes);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.ListarPacientesAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -182,16 +119,8 @@ public class NutricionistaController : ControllerBase
     [HttpPost("pacientes/convite")]
     public async Task<IActionResult> EnviarConvite([FromBody] ConviteVinculoDto dto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.EnviarConvitePacienteAsync(userId, dto);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.EnviarConvitePacienteAsync(GetUserId(), dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -200,16 +129,8 @@ public class NutricionistaController : ControllerBase
     [HttpDelete("pacientes/vinculo/{vinculoId}")]
     public async Task<IActionResult> EncerrarVinculo(int vinculoId)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.EncerrarVinculoAsync(userId, vinculoId);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.EncerrarVinculoAsync(GetUserId(), vinculoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // ===================== ASSINATURA =====================
@@ -220,15 +141,7 @@ public class NutricionistaController : ControllerBase
     [HttpPut("assinatura/{novoPlano}")]
     public async Task<IActionResult> AtualizarPlano(EPlanoAssinatura novoPlano)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.AtualizarPlanoAsync(userId, novoPlano);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.AtualizarPlanoAsync(GetUserId(), novoPlano);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 }

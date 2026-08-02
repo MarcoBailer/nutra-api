@@ -27,10 +27,13 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
     //  REGISTRAR AVALIAÇÃO (auto-avaliação)
     // =====================================================================
 
-    public async Task<AvaliacaoAntropometricaResultadoDto> RegistrarAvaliacaoAsync(
+    public async Task<RetornoPadrao<AvaliacaoAntropometricaResultadoDto>> RegistrarAvaliacaoAsync(
         string userId, AvaliacaoAntropometricaDto dto)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.NaoEncontrado(PerfilAusente);
+
         var avaliacao = CriarEntidadeAvaliacao(perfil, dto, profissionalId: null);
 
         _context.AvaliacoesAntropometricas.Add(avaliacao);
@@ -40,14 +43,15 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
 
         await _context.SaveChangesAsync();
 
-        return MapearResultado(avaliacao, perfil);
+        return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.Criado(
+            MapearResultado(avaliacao, perfil), "Avaliação registrada com sucesso.");
     }
 
     // =====================================================================
     //  REGISTRAR AVALIAÇÃO POR PROFISSIONAL
     // =====================================================================
 
-    public async Task<AvaliacaoAntropometricaResultadoDto> RegistrarAvaliacaoPorProfissionalAsync(
+    public async Task<RetornoPadrao<AvaliacaoAntropometricaResultadoDto>> RegistrarAvaliacaoPorProfissionalAsync(
         string profissionalUserId, string pacienteUserId, AvaliacaoAntropometricaDto dto)
     {
         // Verifica que o profissional tem vínculo ativo com o paciente
@@ -59,13 +63,14 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
                 v.Status == EStatusVinculo.Ativo);
 
         if (vinculo == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Profissional não possui vínculo ativo com este paciente.");
+            return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.Proibido(
+                "Profissional não possui vínculo ativo com este paciente.");
 
-        var perfil = await ObterPerfilOuErro(pacienteUserId);
+        var perfil = await ObterPerfil(pacienteUserId);
+        if (perfil == null)
+            return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.NaoEncontrado(
+                "Paciente não possui perfil nutricional.");
+
         var avaliacao = CriarEntidadeAvaliacao(perfil, dto, profissionalUserId);
 
         _context.AvaliacoesAntropometricas.Add(avaliacao);
@@ -73,16 +78,19 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
 
         await _context.SaveChangesAsync();
 
-        return MapearResultado(avaliacao, perfil);
+        return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.Criado(
+            MapearResultado(avaliacao, perfil), "Avaliação registrada com sucesso.");
     }
 
     // =====================================================================
     //  OBTER AVALIAÇÃO POR ID
     // =====================================================================
 
-    public async Task<AvaliacaoAntropometricaResultadoDto> ObterAvaliacaoPorIdAsync(string userId, int avaliacaoId)
+    public async Task<RetornoPadrao<AvaliacaoAntropometricaResultadoDto>> ObterAvaliacaoPorIdAsync(string userId, int avaliacaoId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.NaoEncontrado(PerfilAusente);
 
         var avaliacao = await _context.AvaliacoesAntropometricas
             .Include(a => a.FotosProgresso)
@@ -90,24 +98,22 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
             .FirstOrDefaultAsync(a => a.Id == avaliacaoId && a.PerfilNutricionalId == perfil.Id);
 
         if (avaliacao == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Avaliação não encontrada.");
+            return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.NaoEncontrado("Avaliação não encontrada.");
 
-        return MapearResultado(avaliacao, perfil);
+        return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.Ok(MapearResultado(avaliacao, perfil));
     }
 
     // =====================================================================
     //  LISTAR AVALIAÇÕES
     // =====================================================================
 
-    public async Task<List<AvaliacaoResumoDto>> ListarAvaliacoesAsync(string userId)
+    public async Task<RetornoPadrao<List<AvaliacaoResumoDto>>> ListarAvaliacoesAsync(string userId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<List<AvaliacaoResumoDto>>.NaoEncontrado(PerfilAusente);
 
-        return await _context.AvaliacoesAntropometricas
+        var lista = await _context.AvaliacoesAntropometricas
             .Where(a => a.PerfilNutricionalId == perfil.Id)
             .OrderByDescending(a => a.DataAvaliacao)
             .Select(a => new AvaliacaoResumoDto
@@ -124,9 +130,11 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
                 TotalFotos = a.FotosProgresso.Count
             })
             .ToListAsync();
+
+        return RetornoPadrao<List<AvaliacaoResumoDto>>.Ok(lista);
     }
 
-    public async Task<List<AvaliacaoResumoDto>> ListarAvaliacoesDoPacienteAsync(
+    public async Task<RetornoPadrao<List<AvaliacaoResumoDto>>> ListarAvaliacoesDoPacienteAsync(
         string profissionalUserId, string pacienteUserId)
     {
         // Verifica vínculo
@@ -138,20 +146,18 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
                 (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente));
 
         if (!vinculoExiste)
-            throw new InvalidOperationException("Profissional não possui vínculo com este paciente.");
+            return RetornoPadrao<List<AvaliacaoResumoDto>>.Proibido(
+                "Profissional não possui vínculo com este paciente.");
 
         var perfil = await _context.PerfilNutricional
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.UserId == pacienteUserId);
 
         if (perfil == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Paciente não possui perfil nutricional.");
+            return RetornoPadrao<List<AvaliacaoResumoDto>>.NaoEncontrado(
+                "Paciente não possui perfil nutricional.");
 
-        return await _context.AvaliacoesAntropometricas
+        var lista = await _context.AvaliacoesAntropometricas
             .Where(a => a.PerfilNutricionalId == perfil.Id)
             .OrderByDescending(a => a.DataAvaliacao)
             .Select(a => new AvaliacaoResumoDto
@@ -168,19 +174,29 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
                 TotalFotos = a.FotosProgresso.Count
             })
             .ToListAsync();
+
+        return RetornoPadrao<List<AvaliacaoResumoDto>>.Ok(lista);
     }
 
     // =====================================================================
     //  COMPARAR AVALIAÇÕES
     // =====================================================================
 
-    public async Task<ComparacaoAvaliacoesDto> CompararAvaliacoesAsync(
+    public async Task<RetornoPadrao<ComparacaoAvaliacoesDto>> CompararAvaliacoesAsync(
         string userId, int avaliacaoAnteriorId, int avaliacaoAtualId)
     {
-        var anterior = await ObterAvaliacaoPorIdAsync(userId, avaliacaoAnteriorId);
-        var atual = await ObterAvaliacaoPorIdAsync(userId, avaliacaoAtualId);
+        var anteriorRetorno = await ObterAvaliacaoPorIdAsync(userId, avaliacaoAnteriorId);
+        if (!anteriorRetorno.Sucesso)
+            return RetornoPadrao<ComparacaoAvaliacoesDto>.Falha(anteriorRetorno);
 
-        return new ComparacaoAvaliacoesDto
+        var atualRetorno = await ObterAvaliacaoPorIdAsync(userId, avaliacaoAtualId);
+        if (!atualRetorno.Sucesso)
+            return RetornoPadrao<ComparacaoAvaliacoesDto>.Falha(atualRetorno);
+
+        var anterior = anteriorRetorno.Dados!;
+        var atual = atualRetorno.Dados!;
+
+        var comparacao = new ComparacaoAvaliacoesDto
         {
             AvaliacaoAnterior = anterior,
             AvaliacaoAtual = atual,
@@ -209,6 +225,8 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
                 DiasEntreAvaliacoes = (int)(atual.DataAvaliacao - anterior.DataAvaliacao).TotalDays
             }
         };
+
+        return RetornoPadrao<ComparacaoAvaliacoesDto>.Ok(comparacao);
     }
 
     // =====================================================================
@@ -217,19 +235,21 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
 
     public async Task<RetornoPadrao> ExcluirAvaliacaoAsync(string userId, int avaliacaoId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
         var avaliacao = await _context.AvaliacoesAntropometricas
             .Include(a => a.FotosProgresso)
             .FirstOrDefaultAsync(a => a.Id == avaliacaoId && a.PerfilNutricionalId == perfil.Id);
 
         if (avaliacao == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Avaliação não encontrada." };
+            return RetornoPadrao.NaoEncontrado("Avaliação não encontrada.");
 
         _context.AvaliacoesAntropometricas.Remove(avaliacao);
         await _context.SaveChangesAsync();
 
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Avaliação excluída com sucesso." };
+        return RetornoPadrao.Ok("Avaliação excluída com sucesso.");
     }
 
     // =====================================================================
@@ -238,13 +258,15 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
 
     public async Task<RetornoPadrao> AdicionarFotosAsync(string userId, int avaliacaoId, List<FotoProgressoDto> fotos)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
         var avaliacao = await _context.AvaliacoesAntropometricas
             .FirstOrDefaultAsync(a => a.Id == avaliacaoId && a.PerfilNutricionalId == perfil.Id);
 
         if (avaliacao == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Avaliação não encontrada." };
+            return RetornoPadrao.NaoEncontrado("Avaliação não encontrada.");
 
         foreach (var fotoDto in fotos)
         {
@@ -258,24 +280,26 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         }
 
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = $"{fotos.Count} foto(s) adicionada(s) com sucesso." };
+        return RetornoPadrao.Criado($"{fotos.Count} foto(s) adicionada(s) com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverFotoAsync(string userId, int fotoId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
         var foto = await _context.FotosProgresso
             .Include(f => f.AvaliacaoAntropometrica)
             .FirstOrDefaultAsync(f => f.Id == fotoId && f.AvaliacaoAntropometrica.PerfilNutricionalId == perfil.Id);
 
         if (foto == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Foto não encontrada." };
+            return RetornoPadrao.NaoEncontrado("Foto não encontrada.");
 
         _context.FotosProgresso.Remove(foto);
         await _context.SaveChangesAsync();
 
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Foto removida com sucesso." };
+        return RetornoPadrao.Ok("Foto removida com sucesso.");
     }
 
     // =====================================================================
@@ -680,18 +704,13 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         return "Não disponível";
     }
 
-    private async Task<PerfilNutricional> ObterPerfilOuErro(string userId)
-    {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+    /// <summary>
+    /// Helper privado: null quando o perfil não existe. Quem envelopa e escolhe
+    /// o status HTTP é o método público.
+    /// </summary>
+    private Task<PerfilNutricional?> ObterPerfil(string userId) =>
+        _context.PerfilNutricional.FirstOrDefaultAsync(p => p.UserId == userId);
 
-        if (perfil == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Perfil nutricional não encontrado. Crie o perfil antes de registrar uma avaliação.");
-
-        return perfil;
-    }
+    private const string PerfilAusente =
+        "Perfil nutricional não encontrado. Crie o perfil antes de registrar uma avaliação.";
 }

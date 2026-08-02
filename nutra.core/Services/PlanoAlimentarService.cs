@@ -24,50 +24,74 @@ public class PlanoAlimentarService : IPlanoAlimentar
     // CRUD Plano
     // ============================================================
 
-    public async Task<PlanoAlimentarResultadoDto> CriarPlanoAsync(string userId, CriarPlanoAlimentarDto dto)
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> CriarPlanoAsync(string userId, CriarPlanoAlimentarDto dto)
     {
-        var perfil = await ObterPerfilOuErro(userId);
-        var plano = await ConstruirPlano(perfil, dto, profissionalId: null);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
+
+        var planoRetorno = await ConstruirPlano(perfil, dto, profissionalId: null);
+        if (!planoRetorno.Sucesso)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.Falha(planoRetorno);
+
+        var plano = planoRetorno.Dados!;
         _context.PlanosAlimentares.Add(plano);
         await _context.SaveChangesAsync();
-        return await MapearPlanoResultado(plano);
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
+            await MapearPlanoResultado(plano), "Plano alimentar criado com sucesso.");
     }
 
-    public async Task<PlanoAlimentarResultadoDto> CriarPlanoPorProfissionalAsync(
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> CriarPlanoPorProfissionalAsync(
         string profissionalUserId, CriarPlanoProfissionalDto dto)
     {
-        await ValidarVinculoProfissional(profissionalUserId, dto.PacienteUserId);
-        var perfil = await ObterPerfilOuErro(dto.PacienteUserId);
-        var plano = await ConstruirPlano(perfil, dto, profissionalUserId);
+        if (!await ExisteVinculoAtivo(profissionalUserId, dto.PacienteUserId))
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.Proibido(
+                "Profissional não possui vínculo ativo com este paciente.");
+
+        var perfil = await ObterPerfil(dto.PacienteUserId);
+        if (perfil == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(
+                "Paciente não possui perfil nutricional.");
+
+        var planoRetorno = await ConstruirPlano(perfil, dto, profissionalUserId);
+        if (!planoRetorno.Sucesso)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.Falha(planoRetorno);
+
+        var plano = planoRetorno.Dados!;
         _context.PlanosAlimentares.Add(plano);
         await _context.SaveChangesAsync();
-        return await MapearPlanoResultado(plano);
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
+            await MapearPlanoResultado(plano), "Plano alimentar criado com sucesso.");
     }
 
-    public async Task<PlanoAlimentarResultadoDto> ObterPlanoAsync(string userId, int planoId)
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> ObterPlanoAsync(string userId, int planoId)
     {
         var plano = await CarregarPlanoCompleto()
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricional.UserId == userId);
-        if (plano == null) 
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Plano alimentar não encontrado.");
-        return await MapearPlanoResultado(plano);
+        if (plano == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Plano alimentar não encontrado.");
+
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Ok(await MapearPlanoResultado(plano));
     }
 
-    public async Task<PlanoAlimentarResultadoDto?> ObterPlanoAtivoAsync(string userId)
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> ObterPlanoAtivoAsync(string userId)
     {
         var plano = await CarregarPlanoCompleto()
             .FirstOrDefaultAsync(p => p.PerfilNutricional.UserId == userId && p.Status == EStatusPlano.Ativo);
-        return plano == null ? null : await MapearPlanoResultado(plano);
+        if (plano == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(
+                "Nenhum plano alimentar ativo encontrado.");
+
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Ok(await MapearPlanoResultado(plano));
     }
 
-    public async Task<List<PlanoAlimentarResumoDto>> ListarPlanosAsync(string userId)
+    public async Task<RetornoPadrao<List<PlanoAlimentarResumoDto>>> ListarPlanosAsync(string userId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
-        return await _context.PlanosAlimentares
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<List<PlanoAlimentarResumoDto>>.NaoEncontrado(PerfilAusente);
+
+        var planos = await _context.PlanosAlimentares
             .Where(p => p.PerfilNutricionalId == perfil.Id)
             .OrderByDescending(p => p.CriadoEm)
             .Select(p => new PlanoAlimentarResumoDto
@@ -84,20 +108,21 @@ public class PlanoAlimentarService : IPlanoAlimentar
                 CriadoEm = p.CriadoEm
             })
             .ToListAsync();
+
+        return RetornoPadrao<List<PlanoAlimentarResumoDto>>.Ok(planos);
     }
 
-    public async Task<PlanoAlimentarResultadoDto> AtualizarPlanoAsync(
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> AtualizarPlanoAsync(
         string userId, int planoId, AtualizarPlanoAlimentarDto dto)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
+
         var plano = await CarregarPlanoCompleto()
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
-        if (plano == null) 
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Plano alimentar não encontrado.");
+        if (plano == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Plano alimentar não encontrado.");
 
         if (dto.Nome != null) plano.Nome = dto.Nome;
         if (dto.Descricao != null) plano.Descricao = dto.Descricao;
@@ -107,28 +132,34 @@ public class PlanoAlimentarService : IPlanoAlimentar
         plano.AtualizadoEm = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
-        return await MapearPlanoResultado(plano);
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Ok(
+            await MapearPlanoResultado(plano), "Plano alimentar atualizado com sucesso.");
     }
 
     public async Task<RetornoPadrao> ExcluirPlanoAsync(string userId, int planoId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
+
         var plano = await _context.PlanosAlimentares
             .Include(p => p.RefeicoesPlanejadas)
                 .ThenInclude(r => r.Itens)
                     .ThenInclude(i => i.SubstituicoesEquivalentes)
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
         if (plano == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Plano alimentar não encontrado." };
+            return RetornoPadrao.NaoEncontrado("Plano alimentar não encontrado.");
 
         _context.PlanosAlimentares.Remove(plano);
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Plano alimentar excluído com sucesso." };
+        return RetornoPadrao.Ok("Plano alimentar excluído com sucesso.");
     }
 
     public async Task<RetornoPadrao> AtivarPlanoAsync(string userId, int planoId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
         // Desativar plano ativo anterior
         var planosAtivos = await _context.PlanosAlimentares
@@ -143,30 +174,29 @@ public class PlanoAlimentarService : IPlanoAlimentar
         var plano = await _context.PlanosAlimentares
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
         if (plano == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Plano alimentar não encontrado." };
+            return RetornoPadrao.NaoEncontrado("Plano alimentar não encontrado.");
 
         plano.Status = EStatusPlano.Ativo;
         plano.AtualizadoEm = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Plano alimentar ativado com sucesso." };
+        return RetornoPadrao.Ok("Plano alimentar ativado com sucesso.");
     }
 
     // ============================================================
     // Refeições
     // ============================================================
 
-    public async Task<PlanoAlimentarResultadoDto> AdicionarRefeicaoAsync(
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> AdicionarRefeicaoAsync(
         string userId, int planoId, AdicionarRefeicaoDto dto)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
+
         var plano = await CarregarPlanoCompleto()
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
         if (plano == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Plano alimentar não encontrado.");
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Plano alimentar não encontrado.");
 
         var refeicao = new RefeicaoPlano
         {
@@ -180,8 +210,10 @@ public class PlanoAlimentarService : IPlanoAlimentar
         {
             foreach (var itemDto in dto.Itens)
             {
-                var item = await ConstruirItem(itemDto);
-                refeicao.Itens.Add(item);
+                var itemRetorno = await ConstruirItem(itemDto);
+                if (!itemRetorno.Sucesso)
+                    return RetornoPadrao<PlanoAlimentarResultadoDto>.Falha(itemRetorno);
+                refeicao.Itens.Add(itemRetorno.Dados!);
             }
             RecalcularTotaisRefeicao(refeicao);
         }
@@ -189,51 +221,50 @@ public class PlanoAlimentarService : IPlanoAlimentar
         plano.RefeicoesPlanejadas.Add(refeicao);
         plano.AtualizadoEm = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return await MapearPlanoResultado(plano);
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
+            await MapearPlanoResultado(plano), "Refeição adicionada com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverRefeicaoAsync(string userId, int refeicaoId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
+
         var refeicao = await _context.Set<RefeicaoPlano>()
             .Include(r => r.PlanoAlimentar)
             .Include(r => r.Itens).ThenInclude(i => i.SubstituicoesEquivalentes)
             .FirstOrDefaultAsync(r => r.Id == refeicaoId && r.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
         if (refeicao == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Refeição não encontrada." };
+            return RetornoPadrao.NaoEncontrado("Refeição não encontrada.");
 
         _context.Set<RefeicaoPlano>().Remove(refeicao);
         refeicao.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Refeição removida com sucesso." };
+        return RetornoPadrao.Ok("Refeição removida com sucesso.");
     }
 
     // ============================================================
     // Itens
     // ============================================================
 
-    public async Task<PlanoAlimentarResultadoDto> AdicionarItemAsync(
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> AdicionarItemAsync(
         string userId, int refeicaoId, AdicionarItemDto dto)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
+
         var refeicao = await _context.Set<RefeicaoPlano>()
             .Include(r => r.PlanoAlimentar)
             .Include(r => r.Itens)
             .FirstOrDefaultAsync(r => r.Id == refeicaoId && r.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
         if (refeicao == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Refeição não encontrada.");
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Refeição não encontrada.");
 
         var alimento = await _busca.BuscaAlimentoPorIdAsync(dto.AlimentoId, dto.TipoTabela);
-        if (alimento == null) 
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Alimento não encontrado.");
+        if (alimento == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Alimento não encontrado.");
 
         var item = CriarItemComMacros(alimento, dto.AlimentoId, dto.TipoTabela, dto.QuantidadeG, dto.Ordem, dto.Observacoes);
         refeicao.Itens.Add(item);
@@ -243,18 +274,22 @@ public class PlanoAlimentarService : IPlanoAlimentar
 
         var plano = await CarregarPlanoCompleto()
             .FirstAsync(p => p.Id == refeicao.PlanoAlimentarId);
-        return await MapearPlanoResultado(plano);
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
+            await MapearPlanoResultado(plano), "Item adicionado com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverItemAsync(string userId, int itemId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
+
         var item = await _context.Set<ItemRefeicao>()
             .Include(i => i.RefeicaoPlano).ThenInclude(r => r.PlanoAlimentar)
             .Include(i => i.SubstituicoesEquivalentes)
             .FirstOrDefaultAsync(i => i.Id == itemId && i.RefeicaoPlano.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
         if (item == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Item não encontrado." };
+            return RetornoPadrao.NaoEncontrado("Item não encontrado.");
 
         var refeicao = item.RefeicaoPlano;
         _context.Set<ItemRefeicao>().Remove(item);
@@ -268,7 +303,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (refeicaoAtualizada != null) RecalcularTotaisRefeicao(refeicaoAtualizada);
         await _context.SaveChangesAsync();
 
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Item removido com sucesso." };
+        return RetornoPadrao.Ok("Item removido com sucesso.");
     }
 
     // ============================================================
@@ -278,29 +313,35 @@ public class PlanoAlimentarService : IPlanoAlimentar
     public async Task<RetornoPadrao> AdicionarSubstituicaoAsync(
         string userId, int itemId, AdicionarSubstituicaoDto dto)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
+
         var item = await _context.Set<ItemRefeicao>()
             .Include(i => i.RefeicaoPlano).ThenInclude(r => r.PlanoAlimentar)
             .Include(i => i.SubstituicoesEquivalentes)
             .FirstOrDefaultAsync(i => i.Id == itemId && i.RefeicaoPlano.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
         if (item == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Item não encontrado." };
+            return RetornoPadrao.NaoEncontrado("Item não encontrado.");
 
         var alimento = await _busca.BuscaAlimentoPorIdAsync(dto.AlimentoId, dto.TipoTabela);
         if (alimento == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Alimento substituto não encontrado." };
+            return RetornoPadrao.NaoEncontrado("Alimento substituto não encontrado.");
 
         var sub = CriarSubstituicaoComMacros(alimento, dto.AlimentoId, dto.TipoTabela, dto.QuantidadeG);
         item.SubstituicoesEquivalentes.Add(sub);
         item.RefeicaoPlano.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Substituição adicionada com sucesso." };
+        return RetornoPadrao.Criado("Substituição adicionada com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverSubstituicaoAsync(string userId, int substituicaoId)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao.NaoEncontrado(PerfilAusente);
+
         var sub = await _context.Set<SubstituicaoEquivalente>()
             .Include(s => s.ItemRefeicao)
                 .ThenInclude(i => i.RefeicaoPlano)
@@ -308,19 +349,19 @@ public class PlanoAlimentarService : IPlanoAlimentar
             .FirstOrDefaultAsync(s => s.Id == substituicaoId &&
                 s.ItemRefeicao.RefeicaoPlano.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
         if (sub == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Substituição não encontrada." };
+            return RetornoPadrao.NaoEncontrado("Substituição não encontrada.");
 
         _context.Set<SubstituicaoEquivalente>().Remove(sub);
         sub.ItemRefeicao.RefeicaoPlano.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Substituição removida com sucesso." };
+        return RetornoPadrao.Ok("Substituição removida com sucesso.");
     }
 
     // ============================================================
     // Modelos de Dieta (Templates)
     // ============================================================
 
-    public async Task<ModeloDietaResultadoDto> CriarModeloDietaAsync(
+    public async Task<RetornoPadrao<ModeloDietaResultadoDto>> CriarModeloDietaAsync(
         string profissionalUserId, CriarModeloDietaDto dto)
     {
         var modelo = new ModeloDieta
@@ -384,10 +425,11 @@ public class PlanoAlimentarService : IPlanoAlimentar
 
         _context.ModelosDieta.Add(modelo);
         await _context.SaveChangesAsync();
-        return MapearModeloResultado(modelo);
+        return RetornoPadrao<ModeloDietaResultadoDto>.Criado(
+            MapearModeloResultado(modelo), "Modelo de dieta criado com sucesso.");
     }
 
-    public async Task<List<ModeloDietaResumoDto>> ListarModelosDietaAsync(string? profissionalUserId)
+    public async Task<RetornoPadrao<List<ModeloDietaResumoDto>>> ListarModelosDietaAsync(string? profissionalUserId)
     {
         var query = _context.ModelosDieta.Where(m => m.Ativo);
 
@@ -396,7 +438,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         else
             query = query.Where(m => m.Publico);
 
-        return await query
+        var modelos = await query
             .OrderBy(m => m.Nome)
             .Select(m => new ModeloDietaResumoDto
             {
@@ -410,21 +452,20 @@ public class PlanoAlimentarService : IPlanoAlimentar
                 Publico = m.Publico
             })
             .ToListAsync();
+
+        return RetornoPadrao<List<ModeloDietaResumoDto>>.Ok(modelos);
     }
 
-    public async Task<ModeloDietaResultadoDto> ObterModeloDietaAsync(int modeloId)
+    public async Task<RetornoPadrao<ModeloDietaResultadoDto>> ObterModeloDietaAsync(int modeloId)
     {
         var modelo = await _context.ModelosDieta
             .Include(m => m.Refeicoes).ThenInclude(r => r.Itens)
             .Include(m => m.CriadoPorProfissional)
             .FirstOrDefaultAsync(m => m.Id == modeloId && m.Ativo);
-        if (modelo == null) 
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Modelo de dieta não encontrado.");
-        return MapearModeloResultado(modelo);
+        if (modelo == null)
+            return RetornoPadrao<ModeloDietaResultadoDto>.NaoEncontrado("Modelo de dieta não encontrado.");
+
+        return RetornoPadrao<ModeloDietaResultadoDto>.Ok(MapearModeloResultado(modelo));
     }
 
     public async Task<RetornoPadrao> ExcluirModeloDietaAsync(string profissionalUserId, int modeloId)
@@ -432,27 +473,26 @@ public class PlanoAlimentarService : IPlanoAlimentar
         var modelo = await _context.ModelosDieta
             .FirstOrDefaultAsync(m => m.Id == modeloId && m.CriadoPorProfissionalId == profissionalUserId);
         if (modelo == null)
-            return new RetornoPadrao { Sucesso = false, Mensagem = "Modelo de dieta não encontrado." };
+            return RetornoPadrao.NaoEncontrado("Modelo de dieta não encontrado.");
 
         modelo.Ativo = false;
         modelo.AtualizadoEm = DateTime.UtcNow;
         await _context.SaveChangesAsync();
-        return new RetornoPadrao { Sucesso = true, Mensagem = "Modelo de dieta excluído com sucesso." };
+        return RetornoPadrao.Ok("Modelo de dieta excluído com sucesso.");
     }
 
-    public async Task<PlanoAlimentarResultadoDto> CriarPlanoAPartirDeModeloAsync(
+    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> CriarPlanoAPartirDeModeloAsync(
         string userId, int modeloId, DateTime dataInicio, DateTime? dataFim)
     {
-        var perfil = await ObterPerfilOuErro(userId);
+        var perfil = await ObterPerfil(userId);
+        if (perfil == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
+
         var modelo = await _context.ModelosDieta
             .Include(m => m.Refeicoes).ThenInclude(r => r.Itens)
             .FirstOrDefaultAsync(m => m.Id == modeloId && m.Ativo);
-        if (modelo == null) 
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Modelo de dieta não encontrado.");
+        if (modelo == null)
+            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Modelo de dieta não encontrado.");
 
         // Buscar metas do perfil para escalonar se necessário
         var meta = await _context.MetasNutricionais
@@ -512,14 +552,20 @@ public class PlanoAlimentarService : IPlanoAlimentar
 
         _context.PlanosAlimentares.Add(plano);
         await _context.SaveChangesAsync();
-        return await MapearPlanoResultado(plano);
+        return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
+            await MapearPlanoResultado(plano), "Plano alimentar criado a partir do modelo.");
     }
 
     // ============================================================
     // Helpers privados
     // ============================================================
 
-    private async Task<PlanoAlimentar> ConstruirPlano(
+    /// <summary>
+    /// Exceção deliberada à regra "helper retorna nullable": a falha aqui carrega
+    /// qual alimento não foi encontrado, informação que um <c>null</c> descartaria.
+    /// Só 2 call sites pagam o desembrulho.
+    /// </summary>
+    private async Task<RetornoPadrao<PlanoAlimentar>> ConstruirPlano(
         PerfilNutricional perfil, CriarPlanoAlimentarDto dto, string? profissionalId)
     {
         // Buscar metas nutricionais para auto-preenchimento
@@ -559,8 +605,10 @@ public class PlanoAlimentarService : IPlanoAlimentar
 
                 foreach (var itemDto in refDto.Itens)
                 {
-                    var item = await ConstruirItem(itemDto);
-                    refeicao.Itens.Add(item);
+                    var itemRetorno = await ConstruirItem(itemDto);
+                    if (!itemRetorno.Sucesso)
+                        return RetornoPadrao<PlanoAlimentar>.Falha(itemRetorno);
+                    refeicao.Itens.Add(itemRetorno.Dados!);
                 }
 
                 RecalcularTotaisRefeicao(refeicao);
@@ -568,18 +616,15 @@ public class PlanoAlimentarService : IPlanoAlimentar
             }
         }
 
-        return plano;
+        return RetornoPadrao<PlanoAlimentar>.Ok(plano);
     }
 
-    private async Task<ItemRefeicao> ConstruirItem(ItemRefeicaoDto dto)
+    private async Task<RetornoPadrao<ItemRefeicao>> ConstruirItem(ItemRefeicaoDto dto)
     {
         var alimento = await _busca.BuscaAlimentoPorIdAsync(dto.AlimentoId, dto.TipoTabela);
-        if (alimento == null) 
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException($"Alimento {dto.AlimentoId} ({dto.TipoTabela}) não encontrado.");
+        if (alimento == null)
+            return RetornoPadrao<ItemRefeicao>.NaoEncontrado(
+                $"Alimento {dto.AlimentoId} ({dto.TipoTabela}) não encontrado.");
 
         var item = CriarItemComMacros(alimento, dto.AlimentoId, dto.TipoTabela, dto.QuantidadeG, dto.Ordem, dto.Observacoes);
 
@@ -594,7 +639,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
             }
         }
 
-        return item;
+        return RetornoPadrao<ItemRefeicao>.Ok(item);
     }
 
     private static ItemRefeicao CriarItemComMacros(
@@ -818,31 +863,21 @@ public class PlanoAlimentarService : IPlanoAlimentar
         };
     }
 
-    private async Task<PerfilNutricional> ObterPerfilOuErro(string userId)
-    {
-        var perfil = await _context.PerfilNutricional.FirstOrDefaultAsync(p => p.UserId == userId);
-        if (perfil == null)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Perfil nutricional não encontrado. Crie o perfil antes de gerenciar planos alimentares.");
-        return perfil;
-    }
+    /// <summary>
+    /// Helper privado: retorna null quando o perfil não existe. Quem envelopa a falha
+    /// e escolhe o status HTTP é o método público — helper não conhece HTTP.
+    /// </summary>
+    private Task<PerfilNutricional?> ObterPerfil(string userId) =>
+        _context.PerfilNutricional.FirstOrDefaultAsync(p => p.UserId == userId);
 
-    private async Task ValidarVinculoProfissional(string profissionalUserId, string pacienteUserId)
-    {
-        var vinculoExiste = await _context.VinculosPacienteProfissional
+    private const string PerfilAusente =
+        "Perfil nutricional não encontrado. Crie o perfil antes de gerenciar planos alimentares.";
+
+    private Task<bool> ExisteVinculoAtivo(string profissionalUserId, string pacienteUserId) =>
+        _context.VinculosPacienteProfissional
             .Include(v => v.Profissional)
             .AnyAsync(v =>
                 v.Profissional.UserId == profissionalUserId &&
                 v.PacienteUserId == pacienteUserId &&
                 v.Status == EStatusVinculo.Ativo);
-        if (!vinculoExiste)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new InvalidOperationException("Profissional não possui vínculo ativo com este paciente.");
-    }
 }

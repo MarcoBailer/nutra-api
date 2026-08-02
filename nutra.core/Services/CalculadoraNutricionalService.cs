@@ -201,12 +201,13 @@ public class CalculadoraNutricionalService : ICalculadoraNutricional
     public (decimal densidade, decimal percentualGordura) CalcularGorduraPorDobras_JP3(
         double[] dobras, int idade, EGeneroBiologico genero)
     {
+        // Guarda de programação, não regra de negócio: o único caller
+        // (AvaliacaoNutricionalService.CalcularDobrasCutaneas) só monta o array
+        // após validar cada dobra. Chegar aqui com menos de 3 é bug do chamador,
+        // não input de usuário — logo, exceção, não RetornoPadrao. Envelopar uma
+        // função pura de cálculo contaminaria o motor com semântica de transporte.
         if (dobras == null || dobras.Length < 3)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new ArgumentException("São necessárias pelo menos 3 dobras cutâneas.");
+            throw new ArgumentException("São necessárias pelo menos 3 dobras cutâneas.", nameof(dobras));
 
         double soma = dobras[0] + dobras[1] + dobras[2];
         double densidade;
@@ -238,12 +239,9 @@ public class CalculadoraNutricionalService : ICalculadoraNutricional
     public (decimal densidade, decimal percentualGordura) CalcularGorduraPorDobras_JP7(
         double[] dobras, int idade, EGeneroBiologico genero)
     {
+        // Mesma justificativa do JP3: guarda de programação, não regra de negócio.
         if (dobras == null || dobras.Length < 7)
-            //TODO:
-            //Nao devemos jogar excecao
-            //retornar status codigo, bool e mensagem
-            //aqui o client que consome decide se redireciona ou nao
-            throw new ArgumentException("São necessárias 7 dobras cutâneas para o protocolo JP7.");
+            throw new ArgumentException("São necessárias 7 dobras cutâneas para o protocolo JP7.", nameof(dobras));
 
         double soma = 0;
         foreach (var d in dobras) soma += d;

@@ -15,15 +15,9 @@ namespace Nutra.Services
 
         public async Task<RetornoPadrao> AtualizarPerfilAsync(string userId, UpdateProfileDto dto)
         {
-            var retorno = new RetornoPadrao();
-
             var user = await _applicationUserService.FindByIdAsync(userId);
             if (user == null)
-            {
-                retorno.Sucesso = false;
-                retorno.Mensagem = "Usuário não encontrado.";
-                return retorno;
-            }
+                return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
             if (dto.NomeCompleto != null) user.NomeCompleto = dto.NomeCompleto;
             if (dto.Cpf != null) user.CPF = dto.Cpf;
@@ -43,59 +37,41 @@ namespace Nutra.Services
             var updated = await _applicationUserService.UpdateAsync(user);
 
             if (!updated)
-            {
-                retorno.Sucesso = false;
-                retorno.Mensagem = "Erro ao atualizar: usuário não encontrado.";
-                return retorno;
-            }
+                return RetornoPadrao.NaoEncontrado("Erro ao atualizar: usuário não encontrado.");
 
-            retorno.Sucesso = true;
-            retorno.Mensagem = "Perfil atualizado com sucesso.";
-            return retorno;
+            return RetornoPadrao.Ok("Perfil atualizado com sucesso.");
         }
 
         public async Task<RetornoPadrao> DesativarContaAsync(string userId)
         {
-            var retorno = new RetornoPadrao();
-
             var user = await _applicationUserService.FindByIdAsync(userId);
             if (user == null)
-            {
-                retorno.Sucesso = false;
-                retorno.Mensagem = "Usuário não encontrado.";
-                return retorno;
-            }
+                return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
             user.Ativo = false;
             user.AtualizadoEm = DateTime.UtcNow;
 
             var updated = await _applicationUserService.UpdateAsync(user);
 
-            retorno.Sucesso = updated;
-            retorno.Mensagem = updated ? "Conta desativada com sucesso." : "Erro ao desativar conta.";
-            return retorno;
+            return updated
+                ? RetornoPadrao.Ok("Conta desativada com sucesso.")
+                : RetornoPadrao.NaoEncontrado("Erro ao desativar conta: usuário não encontrado.");
         }
 
         public async Task<RetornoPadrao> ReativarContaAsync(string userId)
         {
-            var retorno = new RetornoPadrao();
-
             var user = await _applicationUserService.FindByIdAsync(userId);
             if (user == null)
-            {
-                retorno.Sucesso = false;
-                retorno.Mensagem = "Usuário não encontrado.";
-                return retorno;
-            }
+                return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
             user.Ativo = true;
             user.AtualizadoEm = DateTime.UtcNow;
 
             var updated = await _applicationUserService.UpdateAsync(user);
 
-            retorno.Sucesso = updated;
-            retorno.Mensagem = updated ? "Conta reativada com sucesso." : "Erro ao reativar conta.";
-            return retorno;
+            return updated
+                ? RetornoPadrao.Ok("Conta reativada com sucesso.")
+                : RetornoPadrao.NaoEncontrado("Erro ao reativar conta: usuário não encontrado.");
         }
     }
 }

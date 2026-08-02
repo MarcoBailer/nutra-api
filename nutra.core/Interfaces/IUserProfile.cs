@@ -7,7 +7,7 @@ namespace Nutra.Interfaces
     public interface IUserProfile
     {
         // --- Perfil Nutricional ---
-        Task<PerfilNutricionalDto> GetPerfilNutricional(string userId);
+        Task<RetornoPadrao<PerfilNutricionalDto>> GetPerfilNutricional(string userId);
         Task<RetornoPadrao> PostPerfilNutricional(PerfilNutricionalDto perfilNutricional);
         Task<RetornoPadrao> AtualizarPerfilNutricional(string userId, PerfilNutricionalDto dto);
 
@@ -17,17 +17,17 @@ namespace Nutra.Interfaces
 
         // --- Biométrico ---
         Task<RetornoPadrao> PostRegistroBiometrico(string userId, RegistroBiometricoDto registroBiometricoDto);
-        Task<List<RegistroBiometricoDto>> ListarHistoricoBiometrico(string userId);
+        Task<RetornoPadrao<List<RegistroBiometricoDto>>> ListarHistoricoBiometrico(string userId);
 
         // --- Histórico Clínico ---
         Task<RetornoPadrao> AdicionarHistoricoClinico(string userId, HistoricoClinicoDto dto);
         Task<RetornoPadrao> AtualizarHistoricoClinico(string userId, int id, HistoricoClinicoDto dto);
         Task<RetornoPadrao> RemoverHistoricoClinico(string userId, int id);
-        Task<List<HistoricoClinicoDto>> ListarHistoricoClinico(string userId);
+        Task<RetornoPadrao<List<HistoricoClinicoDto>>> ListarHistoricoClinico(string userId);
 
         // --- Anamnese Alimentar ---
         Task<RetornoPadrao> SalvarAnamneseAlimentar(string userId, AnamneseAlimentarDto dto);
-        Task<AnamneseAlimentarDto?> ObterUltimaAnamnese(string userId);
-        Task<List<AnamneseAlimentarDto>> ListarAnamneses(string userId);
+        Task<RetornoPadrao<AnamneseAlimentarDto>> ObterUltimaAnamnese(string userId);
+        Task<RetornoPadrao<List<AnamneseAlimentarDto>>> ListarAnamneses(string userId);
     }
 }

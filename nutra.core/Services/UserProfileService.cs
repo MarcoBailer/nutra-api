@@ -39,22 +39,11 @@ public class UserProfileService : IUserProfile
         {
             var user = await _applicationUserService.FindByEmailAsync(perfil.UserEmail);
             if (user == null)
-                //nao tem que jogar excecao
-                //presumir que eh um usuario novo
-                //redirecionar no frontend para cadastro (se for o caso de ser a primeira criacao)
-                //retornar status codigo, bool e mensagem que indique inexistencia.
-                throw new Exception("Usuário não encontrado.");
+                return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
             bool perfilJaExiste = _context.PerfilNutricional.Any(p => p.User.Email == perfil.UserEmail);
             if (perfilJaExiste)
-                //TODO:
-                //nao tem que jogar excecao
-                //presumir que eh um usuario novo
-                //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
-                //retornar status codigo, bool e mensagem que indique inexistencia.
-                throw new Exception("Perfil nutricional já existe para este usuário.");
-
-            var retorno = new RetornoPadrao();
+                return RetornoPadrao.Conflito("Perfil nutricional já existe para este usuário.");
 
             var registroInicial = new RegistroBiometrico
             {
@@ -138,10 +127,7 @@ public class UserProfileService : IUserProfile
 
             await transaction.CommitAsync();
 
-            retorno.Sucesso = true;
-            retorno.Mensagem = "Perfil nutricional criado com sucesso.";
-
-            return retorno;
+            return RetornoPadrao.Criado("Perfil nutricional criado com sucesso.");
         }
         catch (Exception)
         {
@@ -156,8 +142,6 @@ public class UserProfileService : IUserProfile
 
         try
         {
-            var retorno = new RetornoPadrao();
-
             var perfil = await _context.PerfilNutricional
                 .Include(p => p.RestricoesAlimentares)
                 .Include(p => p.EquipamentoDisponivel)
@@ -165,11 +149,7 @@ public class UserProfileService : IUserProfile
                 .FirstOrDefaultAsync(p => p.UserId == userId);
 
             if (perfil == null)
-            {
-                retorno.Sucesso = false;
-                retorno.Mensagem = "Perfil nutricional não encontrado para o usuário.";
-                return retorno;
-            }
+                return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado para o usuário.");
 
             // Atualiza campos simples
             perfil.AlturaCm = dto.AlturaCm;
@@ -240,9 +220,7 @@ public class UserProfileService : IUserProfile
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
-            retorno.Sucesso = true;
-            retorno.Mensagem = "Perfil nutricional atualizado com sucesso.";
-            return retorno;
+            return RetornoPadrao.Ok("Perfil nutricional atualizado com sucesso.");
         }
         catch (Exception)
         {
@@ -255,26 +233,16 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao> PostPreferenciaAlimentar(string userId, int id, ETipoTabela tabela, ETipoPreferencia afinidade)
     {
-        var retorno = new RetornoPadrao();
-
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-        {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Perfil nutricional não encontrado para o usuário.";
-            return retorno;
-        }
+            return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado para o usuário.");
 
         var alimento = await _busca.BuscaAlimentoPorIdAsync(id, tabela);
 
         if (alimento == null)
-        {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Alimento não encontrado.";
-            return retorno;
-        }
+            return RetornoPadrao.NaoEncontrado("Alimento não encontrado.");
 
         // Verifica se já existe preferência para este alimento
         var existente = await _context.PreferenciaAlimentar
@@ -282,11 +250,12 @@ public class UserProfileService : IUserProfile
                                    && p.AlimentoId == id
                                    && p.Tabela == tabela);
 
+        string mensagem;
         if (existente != null)
         {
             // Atualiza a preferência existente
             existente.Tipo = afinidade;
-            retorno.Mensagem = "Preferência alimentar atualizada com sucesso.";
+            mensagem = "Preferência alimentar atualizada com sucesso.";
         }
         else
         {
@@ -298,36 +267,27 @@ public class UserProfileService : IUserProfile
                 Tipo = afinidade
             };
             _context.PreferenciaAlimentar.Add(preferencia);
-            retorno.Mensagem = "Preferência alimentar registrada com sucesso.";
+            mensagem = "Preferência alimentar registrada com sucesso.";
         }
 
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        return retorno;
+        return RetornoPadrao.Ok(mensagem);
     }
 
     public async Task<RetornoPadrao> RemoverPreferenciaAlimentar(string userId, int preferenciaId)
     {
-        var retorno = new RetornoPadrao();
-
         var preferencia = await _context.PreferenciaAlimentar
             .Include(p => p.Perfil)
             .FirstOrDefaultAsync(p => p.Id == preferenciaId && p.Perfil.UserId == userId);
 
         if (preferencia == null)
-        {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Preferência alimentar não encontrada.";
-            return retorno;
-        }
+            return RetornoPadrao.NaoEncontrado("Preferência alimentar não encontrada.");
 
         _context.PreferenciaAlimentar.Remove(preferencia);
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Preferência alimentar removida com sucesso.";
-        return retorno;
+        return RetornoPadrao.Ok("Preferência alimentar removida com sucesso.");
     }
 
     // ===================== BIOMÉTRICO =====================
@@ -336,19 +296,13 @@ public class UserProfileService : IUserProfile
     {
         var user = await _applicationUserService.FindByIdAsync(userId);
         if (user == null)
-            throw new Exception("Usuário não encontrado.");
+            return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
-        var retorno = new RetornoPadrao();
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-            //TODO:
-            //nao tem que jogar excecao
-            //presumir que eh um usuario novo
-            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
-            //retornar status codigo, bool e mensagem que indique inexistencia.
-            throw new Exception("Perfil nutricional não encontrado para o usuário.");
+            return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado para o usuário.");
 
         var novoRegistroBiometrico = new RegistroBiometrico
         {
@@ -371,26 +325,19 @@ public class UserProfileService : IUserProfile
         _context.RegistroBiometrico.Add(novoRegistroBiometrico);
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Registro biométrico adicionado com sucesso.";
-
-        return retorno;
+        return RetornoPadrao.Criado("Registro biométrico adicionado com sucesso.");
     }
 
-    public async Task<List<RegistroBiometricoDto>> ListarHistoricoBiometrico(string userId)
+    public async Task<RetornoPadrao<List<RegistroBiometricoDto>>> ListarHistoricoBiometrico(string userId)
     {
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-            //TODO:
-            //nao tem que jogar excecao
-            //presumir que eh um usuario novo
-            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
-            //retornar status codigo, bool e mensagem que indique inexistencia.
-            throw new Exception("Perfil nutricional não encontrado.");
+            return RetornoPadrao<List<RegistroBiometricoDto>>.NaoEncontrado(
+                "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
-        return await _context.RegistroBiometrico
+        var historico = await _context.RegistroBiometrico
             .Where(r => r.PerfilNutricionalId == perfil.Id)
             .OrderByDescending(r => r.Data)
             .Select(r => new RegistroBiometricoDto
@@ -400,23 +347,19 @@ public class UserProfileService : IUserProfile
                 CircunferenciaCinturaCm = r.CircunferenciaCinturaCm
             })
             .ToListAsync();
+
+        return RetornoPadrao<List<RegistroBiometricoDto>>.Ok(historico);
     }
 
     // ===================== HISTÓRICO CLÍNICO =====================
 
     public async Task<RetornoPadrao> AdicionarHistoricoClinico(string userId, HistoricoClinicoDto dto)
     {
-        var retorno = new RetornoPadrao();
-
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-        {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Perfil nutricional não encontrado.";
-            return retorno;
-        }
+            return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado.");
 
         var historico = new HistoricoClinico
         {
@@ -432,25 +375,17 @@ public class UserProfileService : IUserProfile
         _context.HistoricoClinicos.Add(historico);
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Condição clínica registrada com sucesso.";
-        return retorno;
+        return RetornoPadrao.Criado("Condição clínica registrada com sucesso.");
     }
 
     public async Task<RetornoPadrao> AtualizarHistoricoClinico(string userId, int id, HistoricoClinicoDto dto)
     {
-        var retorno = new RetornoPadrao();
-
         var historico = await _context.HistoricoClinicos
             .Include(h => h.PerfilNutricional)
             .FirstOrDefaultAsync(h => h.Id == id && h.PerfilNutricional.UserId == userId);
 
         if (historico == null)
-        {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Registro clínico não encontrado.";
-            return retorno;
-        }
+            return RetornoPadrao.NaoEncontrado("Registro clínico não encontrado.");
 
         historico.Condicao = dto.Condicao;
         historico.DescricaoOutra = dto.DescricaoOutra;
@@ -462,48 +397,34 @@ public class UserProfileService : IUserProfile
 
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Registro clínico atualizado com sucesso.";
-        return retorno;
+        return RetornoPadrao.Ok("Registro clínico atualizado com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverHistoricoClinico(string userId, int id)
     {
-        var retorno = new RetornoPadrao();
-
         var historico = await _context.HistoricoClinicos
             .Include(h => h.PerfilNutricional)
             .FirstOrDefaultAsync(h => h.Id == id && h.PerfilNutricional.UserId == userId);
 
         if (historico == null)
-        {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Registro clínico não encontrado.";
-            return retorno;
-        }
+            return RetornoPadrao.NaoEncontrado("Registro clínico não encontrado.");
 
         _context.HistoricoClinicos.Remove(historico);
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Registro clínico removido com sucesso.";
-        return retorno;
+        return RetornoPadrao.Ok("Registro clínico removido com sucesso.");
     }
 
-    public async Task<List<HistoricoClinicoDto>> ListarHistoricoClinico(string userId)
+    public async Task<RetornoPadrao<List<HistoricoClinicoDto>>> ListarHistoricoClinico(string userId)
     {
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-            //TODO:
-            //nao tem que jogar excecao
-            //presumir que eh um usuario novo
-            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
-            //retornar status codigo, bool e mensagem que indique inexistencia.
-            throw new Exception("Perfil nutricional não encontrado.");
+            return RetornoPadrao<List<HistoricoClinicoDto>>.NaoEncontrado(
+                "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
-        return await _context.HistoricoClinicos
+        var historicos = await _context.HistoricoClinicos
             .Where(h => h.PerfilNutricionalId == perfil.Id)
             .OrderByDescending(h => h.CriadoEm)
             .Select(h => new HistoricoClinicoDto
@@ -516,23 +437,19 @@ public class UserProfileService : IUserProfile
                 Observacoes = h.Observacoes
             })
             .ToListAsync();
+
+        return RetornoPadrao<List<HistoricoClinicoDto>>.Ok(historicos);
     }
 
     // ===================== ANAMNESE ALIMENTAR =====================
 
     public async Task<RetornoPadrao> SalvarAnamneseAlimentar(string userId, AnamneseAlimentarDto dto)
     {
-        var retorno = new RetornoPadrao();
-
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-        {
-            retorno.Sucesso = false;
-            retorno.Mensagem = "Perfil nutricional não encontrado.";
-            return retorno;
-        }
+            return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado.");
 
         var anamnese = new AnamneseAlimentar
         {
@@ -570,52 +487,50 @@ public class UserProfileService : IUserProfile
         _context.AnamnesesAlimentares.Add(anamnese);
         await _context.SaveChangesAsync();
 
-        retorno.Sucesso = true;
-        retorno.Mensagem = "Anamnese alimentar registrada com sucesso.";
-        return retorno;
+        return RetornoPadrao.Criado("Anamnese alimentar registrada com sucesso.");
     }
 
-    public async Task<AnamneseAlimentarDto?> ObterUltimaAnamnese(string userId)
+    public async Task<RetornoPadrao<AnamneseAlimentarDto>> ObterUltimaAnamnese(string userId)
     {
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-            return null;
+            return RetornoPadrao<AnamneseAlimentarDto>.NaoEncontrado(
+                "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
         var anamnese = await _context.AnamnesesAlimentares
             .Where(a => a.PerfilNutricionalId == perfil.Id)
             .OrderByDescending(a => a.DataPreenchimento)
             .FirstOrDefaultAsync();
 
-        if (anamnese == null) return null;
+        if (anamnese == null)
+            return RetornoPadrao<AnamneseAlimentarDto>.NaoEncontrado("Nenhuma anamnese encontrada.");
 
-        return MapAnamneseToDto(anamnese);
+        return RetornoPadrao<AnamneseAlimentarDto>.Ok(MapAnamneseToDto(anamnese));
     }
 
-    public async Task<List<AnamneseAlimentarDto>> ListarAnamneses(string userId)
+    public async Task<RetornoPadrao<List<AnamneseAlimentarDto>>> ListarAnamneses(string userId)
     {
         var perfil = await _context.PerfilNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
-            //TODO:
-            //nao tem que jogar excecao
-            //presumir que eh um usuario novo
-            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
-            //retornar status codigo, bool e mensagem que indique inexistencia.
-            throw new Exception("Perfil nutricional não encontrado.");
+            return RetornoPadrao<List<AnamneseAlimentarDto>>.NaoEncontrado(
+                "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
-        return await _context.AnamnesesAlimentares
+        var anamneses = await _context.AnamnesesAlimentares
             .Where(a => a.PerfilNutricionalId == perfil.Id)
             .OrderByDescending(a => a.DataPreenchimento)
             .Select(a => MapAnamneseToDto(a))
             .ToListAsync();
+
+        return RetornoPadrao<List<AnamneseAlimentarDto>>.Ok(anamneses);
     }
 
     // ===================== PERFIL NUTRICIONAL GET =====================
 
-    public async Task<PerfilNutricionalDto> GetPerfilNutricional(string userId)
+    public async Task<RetornoPadrao<PerfilNutricionalDto>> GetPerfilNutricional(string userId)
     {
         var perfil = await _context.PerfilNutricional
             .Include(p => p.RestricoesAlimentares)
@@ -624,13 +539,10 @@ public class UserProfileService : IUserProfile
             .Include(p => p.HistoricosClinico)
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
+        // Perfil ausente é o caso de primeiro acesso: 404 para o client redirecionar ao onboarding.
         if (perfil == null)
-            //TODO:
-            //nao tem que jogar excecao
-            //presumir que eh um usuario novo
-            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
-            //retornar status codigo, bool e mensagem que indique inexistencia.
-            throw new Exception("Perfil nutricional não encontrado para o usuário.");
+            return RetornoPadrao<PerfilNutricionalDto>.NaoEncontrado(
+                "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
         var perfilDto = new PerfilNutricionalDto
         {
@@ -684,7 +596,7 @@ public class UserProfileService : IUserProfile
                 }).ToList()
         };
 
-        return perfilDto;
+        return RetornoPadrao<PerfilNutricionalDto>.Ok(perfilDto);
     }
 
     // ===================== HELPERS =====================

@@ -18,7 +18,9 @@ public class PlanoAlimentarController : ControllerBase
         _planoService = planoService;
     }
 
-    private string GetUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier)!;
+    private string GetUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
 
     // ============================================================
     // CRUD Plano
@@ -30,15 +32,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CriarPlano([FromBody] CriarPlanoAlimentarDto dto)
     {
-        try
-        {
-            var resultado = await _planoService.CriarPlanoAsync(GetUserId(), dto);
-            return CreatedAtAction(nameof(ObterPlano), new { planoId = resultado.Id }, resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.CriarPlanoAsync(GetUserId(), dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -47,15 +42,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPost("profissional")]
     public async Task<IActionResult> CriarPlanoProfissional([FromBody] CriarPlanoProfissionalDto dto)
     {
-        try
-        {
-            var resultado = await _planoService.CriarPlanoPorProfissionalAsync(GetUserId(), dto);
-            return CreatedAtAction(nameof(ObterPlano), new { planoId = resultado.Id }, resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.CriarPlanoPorProfissionalAsync(GetUserId(), dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -64,15 +52,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpGet("{planoId:int}")]
     public async Task<IActionResult> ObterPlano(int planoId)
     {
-        try
-        {
-            var resultado = await _planoService.ObterPlanoAsync(GetUserId(), planoId);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.ObterPlanoAsync(GetUserId(), planoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -81,10 +62,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpGet("ativo")]
     public async Task<IActionResult> ObterPlanoAtivo()
     {
-        var resultado = await _planoService.ObterPlanoAtivoAsync(GetUserId());
-        if (resultado == null)
-            return NotFound(new { sucesso = false, mensagem = "Nenhum plano alimentar ativo encontrado." });
-        return Ok(resultado);
+        var retorno = await _planoService.ObterPlanoAtivoAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -93,15 +72,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> ListarPlanos()
     {
-        try
-        {
-            var resultado = await _planoService.ListarPlanosAsync(GetUserId());
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.ListarPlanosAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -110,15 +82,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPut("{planoId:int}")]
     public async Task<IActionResult> AtualizarPlano(int planoId, [FromBody] AtualizarPlanoAlimentarDto dto)
     {
-        try
-        {
-            var resultado = await _planoService.AtualizarPlanoAsync(GetUserId(), planoId, dto);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.AtualizarPlanoAsync(GetUserId(), planoId, dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -127,8 +92,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpDelete("{planoId:int}")]
     public async Task<IActionResult> ExcluirPlano(int planoId)
     {
-        var resultado = await _planoService.ExcluirPlanoAsync(GetUserId(), planoId);
-        return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
+        var retorno = await _planoService.ExcluirPlanoAsync(GetUserId(), planoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -137,8 +102,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPost("{planoId:int}/ativar")]
     public async Task<IActionResult> AtivarPlano(int planoId)
     {
-        var resultado = await _planoService.AtivarPlanoAsync(GetUserId(), planoId);
-        return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
+        var retorno = await _planoService.AtivarPlanoAsync(GetUserId(), planoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // ============================================================
@@ -151,15 +116,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPost("{planoId:int}/refeicoes")]
     public async Task<IActionResult> AdicionarRefeicao(int planoId, [FromBody] AdicionarRefeicaoDto dto)
     {
-        try
-        {
-            var resultado = await _planoService.AdicionarRefeicaoAsync(GetUserId(), planoId, dto);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.AdicionarRefeicaoAsync(GetUserId(), planoId, dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -168,8 +126,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpDelete("refeicoes/{refeicaoId:int}")]
     public async Task<IActionResult> RemoverRefeicao(int refeicaoId)
     {
-        var resultado = await _planoService.RemoverRefeicaoAsync(GetUserId(), refeicaoId);
-        return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
+        var retorno = await _planoService.RemoverRefeicaoAsync(GetUserId(), refeicaoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // ============================================================
@@ -182,15 +140,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPost("refeicoes/{refeicaoId:int}/itens")]
     public async Task<IActionResult> AdicionarItem(int refeicaoId, [FromBody] AdicionarItemDto dto)
     {
-        try
-        {
-            var resultado = await _planoService.AdicionarItemAsync(GetUserId(), refeicaoId, dto);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.AdicionarItemAsync(GetUserId(), refeicaoId, dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -199,8 +150,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpDelete("itens/{itemId:int}")]
     public async Task<IActionResult> RemoverItem(int itemId)
     {
-        var resultado = await _planoService.RemoverItemAsync(GetUserId(), itemId);
-        return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
+        var retorno = await _planoService.RemoverItemAsync(GetUserId(), itemId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // ============================================================
@@ -213,8 +164,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPost("itens/{itemId:int}/substituicoes")]
     public async Task<IActionResult> AdicionarSubstituicao(int itemId, [FromBody] AdicionarSubstituicaoDto dto)
     {
-        var resultado = await _planoService.AdicionarSubstituicaoAsync(GetUserId(), itemId, dto);
-        return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
+        var retorno = await _planoService.AdicionarSubstituicaoAsync(GetUserId(), itemId, dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -223,8 +174,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpDelete("substituicoes/{substituicaoId:int}")]
     public async Task<IActionResult> RemoverSubstituicao(int substituicaoId)
     {
-        var resultado = await _planoService.RemoverSubstituicaoAsync(GetUserId(), substituicaoId);
-        return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
+        var retorno = await _planoService.RemoverSubstituicaoAsync(GetUserId(), substituicaoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // ============================================================
@@ -237,15 +188,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpPost("modelos")]
     public async Task<IActionResult> CriarModeloDieta([FromBody] CriarModeloDietaDto dto)
     {
-        try
-        {
-            var resultado = await _planoService.CriarModeloDietaAsync(GetUserId(), dto);
-            return CreatedAtAction(nameof(ObterModeloDieta), new { modeloId = resultado.Id }, resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.CriarModeloDietaAsync(GetUserId(), dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -254,8 +198,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpGet("modelos")]
     public async Task<IActionResult> ListarModelos()
     {
-        var resultado = await _planoService.ListarModelosDietaAsync(GetUserId());
-        return Ok(resultado);
+        var retorno = await _planoService.ListarModelosDietaAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -264,15 +208,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpGet("modelos/{modeloId:int}")]
     public async Task<IActionResult> ObterModeloDieta(int modeloId)
     {
-        try
-        {
-            var resultado = await _planoService.ObterModeloDietaAsync(modeloId);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.ObterModeloDietaAsync(modeloId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -281,8 +218,8 @@ public class PlanoAlimentarController : ControllerBase
     [HttpDelete("modelos/{modeloId:int}")]
     public async Task<IActionResult> ExcluirModeloDieta(int modeloId)
     {
-        var resultado = await _planoService.ExcluirModeloDietaAsync(GetUserId(), modeloId);
-        return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
+        var retorno = await _planoService.ExcluirModeloDietaAsync(GetUserId(), modeloId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -294,14 +231,7 @@ public class PlanoAlimentarController : ControllerBase
         [FromQuery] DateTime dataInicio,
         [FromQuery] DateTime? dataFim = null)
     {
-        try
-        {
-            var resultado = await _planoService.CriarPlanoAPartirDeModeloAsync(GetUserId(), modeloId, dataInicio, dataFim);
-            return CreatedAtAction(nameof(ObterPlano), new { planoId = resultado.Id }, resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { sucesso = false, mensagem = ex.Message });
-        }
+        var retorno = await _planoService.CriarPlanoAPartirDeModeloAsync(GetUserId(), modeloId, dataInicio, dataFim);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 }

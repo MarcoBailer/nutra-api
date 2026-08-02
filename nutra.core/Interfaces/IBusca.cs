@@ -6,5 +6,6 @@ namespace Nutra.Interfaces;
 public interface IBusca
 {
     Task<List<AlimentoResumoDto>> BuscaAlimentoAsync(string termo);
-    Task<AlimentoResumoDto> BuscaAlimentoPorIdAsync(int id, ETipoTabela tabela);
+    /// <summary>Retorna null quando o alimento não existe na tabela informada.</summary>
+    Task<AlimentoResumoDto?> BuscaAlimentoPorIdAsync(int id, ETipoTabela tabela);
 }

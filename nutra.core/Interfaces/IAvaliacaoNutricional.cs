@@ -14,33 +14,33 @@ public interface IAvaliacaoNutricional
     /// Registra uma nova avaliação antropométrica completa para o paciente.
     /// Calcula automaticamente: IMC, RCQ, %gordura (dobras/bio), TMB (3 fórmulas), GET, peso ideal, macros.
     /// </summary>
-    Task<AvaliacaoAntropometricaResultadoDto> RegistrarAvaliacaoAsync(string userId, AvaliacaoAntropometricaDto dto);
+    Task<RetornoPadrao<AvaliacaoAntropometricaResultadoDto>> RegistrarAvaliacaoAsync(string userId, AvaliacaoAntropometricaDto dto);
 
     /// <summary>
     /// Registra avaliação em nome de um paciente (nutricionista logado).
     /// </summary>
-    Task<AvaliacaoAntropometricaResultadoDto> RegistrarAvaliacaoPorProfissionalAsync(
+    Task<RetornoPadrao<AvaliacaoAntropometricaResultadoDto>> RegistrarAvaliacaoPorProfissionalAsync(
         string profissionalUserId, string pacienteUserId, AvaliacaoAntropometricaDto dto);
 
     /// <summary>
     /// Obtém avaliação completa por Id.
     /// </summary>
-    Task<AvaliacaoAntropometricaResultadoDto> ObterAvaliacaoPorIdAsync(string userId, int avaliacaoId);
+    Task<RetornoPadrao<AvaliacaoAntropometricaResultadoDto>> ObterAvaliacaoPorIdAsync(string userId, int avaliacaoId);
 
     /// <summary>
     /// Lista todas as avaliações do paciente (resumidas, ordenadas por data desc).
     /// </summary>
-    Task<List<AvaliacaoResumoDto>> ListarAvaliacoesAsync(string userId);
+    Task<RetornoPadrao<List<AvaliacaoResumoDto>>> ListarAvaliacoesAsync(string userId);
 
     /// <summary>
     /// Lista avaliações de um paciente específico (visão do nutricionista).
     /// </summary>
-    Task<List<AvaliacaoResumoDto>> ListarAvaliacoesDoPacienteAsync(string profissionalUserId, string pacienteUserId);
+    Task<RetornoPadrao<List<AvaliacaoResumoDto>>> ListarAvaliacoesDoPacienteAsync(string profissionalUserId, string pacienteUserId);
 
     /// <summary>
     /// Compara duas avaliações e calcula a evolução.
     /// </summary>
-    Task<ComparacaoAvaliacoesDto> CompararAvaliacoesAsync(string userId, int avaliacaoAnteriorId, int avaliacaoAtualId);
+    Task<RetornoPadrao<ComparacaoAvaliacoesDto>> CompararAvaliacoesAsync(string userId, int avaliacaoAnteriorId, int avaliacaoAtualId);
 
     /// <summary>
     /// Exclui uma avaliação (soft ou hard delete conforme regras).

@@ -18,30 +18,22 @@ public class RefeicaoController : ControllerBase
         _refeicao = refeicao;
     }
 
+    private string GetUserId() =>
+        User.FindFirstValue(ClaimTypes.NameIdentifier)
+        ?? throw new UnauthorizedAccessException("Usuário não autenticado.");
+
     [HttpPost("cadastrar-refeicao")]
     public async Task<IActionResult> PostConsumoAsync(int alimentoId, ETipoTabela tabela, double quantidadeIngeridaG, ETipoRefeicao nomeRefeicao)
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
-        {
-            return Unauthorized("Token inválido: ID do usuário não encontrado.");
-        }
-        var result = await _refeicao.RegistrarConsumoAsync(userId, alimentoId, tabela, quantidadeIngeridaG, nomeRefeicao);
-        return Ok(result);
+        var retorno = await _refeicao.RegistrarConsumoAsync(
+            GetUserId(), alimentoId, tabela, quantidadeIngeridaG, nomeRefeicao);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     [HttpGet("status-diario")]
     public async Task<IActionResult> GetStatusDiarioAsync()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
-            return Unauthorized("Token inválido: ID do usuário não encontrado.");
-
-        var status = await _refeicao.ObterStatusDiario(userId);
-
-        if (status is null)
-            return NotFound(new { Sucesso = false, Mensagem = "Perfil nutricional não encontrado. Conclua o onboarding primeiro." });
-
-        return Ok(status);
+        var retorno = await _refeicao.ObterStatusDiario(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 }

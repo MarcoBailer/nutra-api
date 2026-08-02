@@ -84,7 +84,7 @@ namespace Nutra.Services
 
         }
 
-        public async Task<AlimentoResumoDto> BuscaAlimentoPorIdAsync(int id, ETipoTabela tabela)
+        public async Task<AlimentoResumoDto?> BuscaAlimentoPorIdAsync(int id, ETipoTabela tabela)
         {
             AlimentoResumoDto? alimentoEncontrado = null;
 

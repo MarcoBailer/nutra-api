@@ -36,20 +36,8 @@ public class AvaliacaoNutricionalController : ControllerBase
     [HttpPost("registrar")]
     public async Task<IActionResult> RegistrarAvaliacao([FromBody] AvaliacaoAntropometricaDto dto)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _avaliacaoService.RegistrarAvaliacaoAsync(userId, dto);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.RegistrarAvaliacaoAsync(GetUserId(), dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -58,20 +46,8 @@ public class AvaliacaoNutricionalController : ControllerBase
     [HttpGet("{avaliacaoId:int}")]
     public async Task<IActionResult> ObterAvaliacao(int avaliacaoId)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _avaliacaoService.ObterAvaliacaoPorIdAsync(userId, avaliacaoId);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { Sucesso = false, Mensagem = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.ObterAvaliacaoPorIdAsync(GetUserId(), avaliacaoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -80,20 +56,8 @@ public class AvaliacaoNutricionalController : ControllerBase
     [HttpGet("minhas-avaliacoes")]
     public async Task<IActionResult> ListarMinhasAvaliacoes()
     {
-        try
-        {
-            var userId = GetUserId();
-            var lista = await _avaliacaoService.ListarAvaliacoesAsync(userId);
-            return Ok(lista);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.ListarAvaliacoesAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -102,20 +66,8 @@ public class AvaliacaoNutricionalController : ControllerBase
     [HttpGet("comparar/{anteriorId:int}/{atualId:int}")]
     public async Task<IActionResult> CompararAvaliacoes(int anteriorId, int atualId)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _avaliacaoService.CompararAvaliacoesAsync(userId, anteriorId, atualId);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return NotFound(new { Sucesso = false, Mensagem = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.CompararAvaliacoesAsync(GetUserId(), anteriorId, atualId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -124,16 +76,8 @@ public class AvaliacaoNutricionalController : ControllerBase
     [HttpDelete("{avaliacaoId:int}")]
     public async Task<IActionResult> ExcluirAvaliacao(int avaliacaoId)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _avaliacaoService.ExcluirAvaliacaoAsync(userId, avaliacaoId);
-            return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.ExcluirAvaliacaoAsync(GetUserId(), avaliacaoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // =====================================================================
@@ -148,21 +92,9 @@ public class AvaliacaoNutricionalController : ControllerBase
     public async Task<IActionResult> RegistrarAvaliacaoPorProfissional(
         string pacienteUserId, [FromBody] AvaliacaoAntropometricaDto dto)
     {
-        try
-        {
-            var profissionalUserId = GetUserId();
-            var resultado = await _avaliacaoService.RegistrarAvaliacaoPorProfissionalAsync(
-                profissionalUserId, pacienteUserId, dto);
-            return Ok(resultado);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.RegistrarAvaliacaoPorProfissionalAsync(
+            GetUserId(), pacienteUserId, dto);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -172,20 +104,8 @@ public class AvaliacaoNutricionalController : ControllerBase
     [Authorize(Roles = "Nutricionista,Admin")]
     public async Task<IActionResult> ListarAvaliacoesDoPaciente(string pacienteUserId)
     {
-        try
-        {
-            var profissionalUserId = GetUserId();
-            var lista = await _avaliacaoService.ListarAvaliacoesDoPacienteAsync(profissionalUserId, pacienteUserId);
-            return Ok(lista);
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.ListarAvaliacoesDoPacienteAsync(GetUserId(), pacienteUserId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     // =====================================================================
@@ -198,16 +118,8 @@ public class AvaliacaoNutricionalController : ControllerBase
     [HttpPost("{avaliacaoId:int}/fotos")]
     public async Task<IActionResult> AdicionarFotos(int avaliacaoId, [FromBody] List<FotoProgressoDto> fotos)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _avaliacaoService.AdicionarFotosAsync(userId, avaliacaoId, fotos);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.AdicionarFotosAsync(GetUserId(), avaliacaoId, fotos);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -216,15 +128,7 @@ public class AvaliacaoNutricionalController : ControllerBase
     [HttpDelete("fotos/{fotoId:int}")]
     public async Task<IActionResult> RemoverFoto(int fotoId)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _avaliacaoService.RemoverFotoAsync(userId, fotoId);
-            return resultado.Sucesso ? Ok(resultado) : NotFound(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _avaliacaoService.RemoverFotoAsync(GetUserId(), fotoId);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 }

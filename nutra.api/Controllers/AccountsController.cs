@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Nutra.Interfaces;
+using Nutra.Models;
 using Nutra.Models.Dtos;
 using System.Security.Claims;
 
@@ -40,10 +41,12 @@ public class AccountsController : ControllerBase
 
         if (user == null)
         {
-            return Unauthorized("Usuário autenticado não possui projeção local na NutraApi.");
+            var falha = RetornoPadrao<object>.NaoEncontrado(
+                "Usuário autenticado não possui projeção local na NutraApi.");
+            return StatusCode(falha.StatusCode, falha);
         }
 
-        return Ok(new
+        var dados = new
         {
             user.Id,
             user.NomeCompleto,
@@ -65,7 +68,10 @@ public class AccountsController : ControllerBase
                 user.Estado,
                 user.CEP
             }
-        });
+        };
+
+        var retorno = RetornoPadrao<object>.Ok(dados);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -74,16 +80,8 @@ public class AccountsController : ControllerBase
     [HttpPut("update-profile")]
     public async Task<IActionResult> UpdateProfile([FromBody] UpdateProfileDto model)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _accounts.AtualizarPerfilAsync(userId, model);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _accounts.AtualizarPerfilAsync(GetUserId(), model);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -92,16 +90,8 @@ public class AccountsController : ControllerBase
     [HttpPost("desativar")]
     public async Task<IActionResult> DesativarConta()
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _accounts.DesativarContaAsync(userId);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _accounts.DesativarContaAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -110,16 +100,8 @@ public class AccountsController : ControllerBase
     [HttpPost("reativar")]
     public async Task<IActionResult> ReativarConta()
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _accounts.ReativarContaAsync(userId);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _accounts.ReativarContaAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -128,16 +110,8 @@ public class AccountsController : ControllerBase
     [HttpPost("vinculos/{vinculoId}/responder")]
     public async Task<IActionResult> ResponderConvite(int vinculoId, [FromQuery] bool aceitar)
     {
-        try
-        {
-            var userId = GetUserId();
-            var resultado = await _nutricionista.ResponderConviteAsync(userId, vinculoId, aceitar);
-            return resultado.Sucesso ? Ok(resultado) : BadRequest(resultado);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.ResponderConviteAsync(GetUserId(), vinculoId, aceitar);
+        return StatusCode(retorno.StatusCode, retorno);
     }
 
     /// <summary>
@@ -146,15 +120,7 @@ public class AccountsController : ControllerBase
     [HttpGet("meus-nutricionistas")]
     public async Task<IActionResult> ListarMeusNutricionistas()
     {
-        try
-        {
-            var userId = GetUserId();
-            var nutricionistas = await _nutricionista.ListarNutricionistasAsync(userId);
-            return Ok(nutricionistas);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(new { Sucesso = false, Mensagem = ex.Message });
-        }
+        var retorno = await _nutricionista.ListarNutricionistasAsync(GetUserId());
+        return StatusCode(retorno.StatusCode, retorno);
     }
 }
