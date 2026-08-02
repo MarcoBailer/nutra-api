@@ -59,6 +59,10 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
                 v.Status == EStatusVinculo.Ativo);
 
         if (vinculo == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Profissional não possui vínculo ativo com este paciente.");
 
         var perfil = await ObterPerfilOuErro(pacienteUserId);
@@ -86,6 +90,10 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
             .FirstOrDefaultAsync(a => a.Id == avaliacaoId && a.PerfilNutricionalId == perfil.Id);
 
         if (avaliacao == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Avaliação não encontrada.");
 
         return MapearResultado(avaliacao, perfil);
@@ -137,6 +145,10 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
             .FirstOrDefaultAsync(p => p.UserId == pacienteUserId);
 
         if (perfil == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Paciente não possui perfil nutricional.");
 
         return await _context.AvaliacoesAntropometricas
@@ -674,6 +686,10 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Perfil nutricional não encontrado. Crie o perfil antes de registrar uma avaliação.");
 
         return perfil;

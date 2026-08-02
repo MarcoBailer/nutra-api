@@ -39,10 +39,19 @@ public class UserProfileService : IUserProfile
         {
             var user = await _applicationUserService.FindByEmailAsync(perfil.UserEmail);
             if (user == null)
+                //nao tem que jogar excecao
+                //presumir que eh um usuario novo
+                //redirecionar no frontend para cadastro (se for o caso de ser a primeira criacao)
+                //retornar status codigo, bool e mensagem que indique inexistencia.
                 throw new Exception("Usuário não encontrado.");
 
             bool perfilJaExiste = _context.PerfilNutricional.Any(p => p.User.Email == perfil.UserEmail);
             if (perfilJaExiste)
+                //TODO:
+                //nao tem que jogar excecao
+                //presumir que eh um usuario novo
+                //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
+                //retornar status codigo, bool e mensagem que indique inexistencia.
                 throw new Exception("Perfil nutricional já existe para este usuário.");
 
             var retorno = new RetornoPadrao();
@@ -334,6 +343,11 @@ public class UserProfileService : IUserProfile
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
+            //TODO:
+            //nao tem que jogar excecao
+            //presumir que eh um usuario novo
+            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
+            //retornar status codigo, bool e mensagem que indique inexistencia.
             throw new Exception("Perfil nutricional não encontrado para o usuário.");
 
         var novoRegistroBiometrico = new RegistroBiometrico
@@ -369,6 +383,11 @@ public class UserProfileService : IUserProfile
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
+            //TODO:
+            //nao tem que jogar excecao
+            //presumir que eh um usuario novo
+            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
+            //retornar status codigo, bool e mensagem que indique inexistencia.
             throw new Exception("Perfil nutricional não encontrado.");
 
         return await _context.RegistroBiometrico
@@ -477,6 +496,11 @@ public class UserProfileService : IUserProfile
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
+            //TODO:
+            //nao tem que jogar excecao
+            //presumir que eh um usuario novo
+            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
+            //retornar status codigo, bool e mensagem que indique inexistencia.
             throw new Exception("Perfil nutricional não encontrado.");
 
         return await _context.HistoricoClinicos
@@ -575,6 +599,11 @@ public class UserProfileService : IUserProfile
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
+            //TODO:
+            //nao tem que jogar excecao
+            //presumir que eh um usuario novo
+            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
+            //retornar status codigo, bool e mensagem que indique inexistencia.
             throw new Exception("Perfil nutricional não encontrado.");
 
         return await _context.AnamnesesAlimentares
@@ -596,6 +625,11 @@ public class UserProfileService : IUserProfile
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
+            //TODO:
+            //nao tem que jogar excecao
+            //presumir que eh um usuario novo
+            //redirecionar no frontend para cadastro de perfil(se for o caso de ser a primeira criacao)
+            //retornar status codigo, bool e mensagem que indique inexistencia.
             throw new Exception("Perfil nutricional não encontrado para o usuário.");
 
         var perfilDto = new PerfilNutricionalDto

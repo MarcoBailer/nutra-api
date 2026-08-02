@@ -30,6 +30,10 @@ public class DiarioAlimentarService : IDiarioAlimentar
     {
         var alimento = await _busca.BuscaAlimentoPorIdAsync(dto.AlimentoId, dto.TipoTabela);
         if (alimento == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Alimento não encontrado.");
 
         var registro = CriarRegistroAlimentar(userId, alimento, dto);
@@ -172,6 +176,10 @@ public class DiarioAlimentarService : IDiarioAlimentar
                 v.PacienteUserId == pacienteUserId &&
                 (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente));
         if (!vinculoExiste)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Profissional não possui vínculo com este paciente.");
 
         return await CalcularRelatorio(pacienteUserId, dataInicio, dataFim);

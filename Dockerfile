@@ -10,13 +10,15 @@ FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
 # Copia apenas .csproj primeiro (layer de cache para restore)
-COPY ["nutra.api.csproj", "."]
-RUN dotnet restore "nutra.api.csproj"
+COPY ["nutra.api/nutra.api.csproj", "nutra.api/"]
+COPY ["nutra.core/nutra.core.csproj", "nutra.core/"]
+COPY ["nutra.data/nutra.data.csproj", "nutra.data/"]
+RUN dotnet restore "nutra.api/nutra.api.csproj"
 
 # Copia o restante do código-fonte
 COPY . .
 
-RUN dotnet publish "nutra.api.csproj" -c Release -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "nutra.api/nutra.api.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
 # ── Stage 2: Runtime ────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
@@ -50,4 +52,4 @@ EXPOSE 8080
 ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:8080
 
-ENTRYPOINT ["dotnet", "Nutra.dll"]
+ENTRYPOINT ["dotnet", "nutra.api.dll"]

@@ -48,7 +48,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
     {
         var plano = await CarregarPlanoCompleto()
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricional.UserId == userId);
-        if (plano == null) throw new InvalidOperationException("Plano alimentar não encontrado.");
+        if (plano == null) 
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException("Plano alimentar não encontrado.");
         return await MapearPlanoResultado(plano);
     }
 
@@ -87,7 +92,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
         var perfil = await ObterPerfilOuErro(userId);
         var plano = await CarregarPlanoCompleto()
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
-        if (plano == null) throw new InvalidOperationException("Plano alimentar não encontrado.");
+        if (plano == null) 
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException("Plano alimentar não encontrado.");
 
         if (dto.Nome != null) plano.Nome = dto.Nome;
         if (dto.Descricao != null) plano.Descricao = dto.Descricao;
@@ -151,7 +161,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
         var perfil = await ObterPerfilOuErro(userId);
         var plano = await CarregarPlanoCompleto()
             .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
-        if (plano == null) throw new InvalidOperationException("Plano alimentar não encontrado.");
+        if (plano == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException("Plano alimentar não encontrado.");
 
         var refeicao = new RefeicaoPlano
         {
@@ -205,10 +220,20 @@ public class PlanoAlimentarService : IPlanoAlimentar
             .Include(r => r.PlanoAlimentar)
             .Include(r => r.Itens)
             .FirstOrDefaultAsync(r => r.Id == refeicaoId && r.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
-        if (refeicao == null) throw new InvalidOperationException("Refeição não encontrada.");
+        if (refeicao == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException("Refeição não encontrada.");
 
         var alimento = await _busca.BuscaAlimentoPorIdAsync(dto.AlimentoId, dto.TipoTabela);
-        if (alimento == null) throw new InvalidOperationException("Alimento não encontrado.");
+        if (alimento == null) 
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException("Alimento não encontrado.");
 
         var item = CriarItemComMacros(alimento, dto.AlimentoId, dto.TipoTabela, dto.QuantidadeG, dto.Ordem, dto.Observacoes);
         refeicao.Itens.Add(item);
@@ -393,7 +418,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
             .Include(m => m.Refeicoes).ThenInclude(r => r.Itens)
             .Include(m => m.CriadoPorProfissional)
             .FirstOrDefaultAsync(m => m.Id == modeloId && m.Ativo);
-        if (modelo == null) throw new InvalidOperationException("Modelo de dieta não encontrado.");
+        if (modelo == null) 
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException("Modelo de dieta não encontrado.");
         return MapearModeloResultado(modelo);
     }
 
@@ -417,7 +447,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
         var modelo = await _context.ModelosDieta
             .Include(m => m.Refeicoes).ThenInclude(r => r.Itens)
             .FirstOrDefaultAsync(m => m.Id == modeloId && m.Ativo);
-        if (modelo == null) throw new InvalidOperationException("Modelo de dieta não encontrado.");
+        if (modelo == null) 
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException("Modelo de dieta não encontrado.");
 
         // Buscar metas do perfil para escalonar se necessário
         var meta = await _context.MetasNutricionais
@@ -539,7 +574,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
     private async Task<ItemRefeicao> ConstruirItem(ItemRefeicaoDto dto)
     {
         var alimento = await _busca.BuscaAlimentoPorIdAsync(dto.AlimentoId, dto.TipoTabela);
-        if (alimento == null) throw new InvalidOperationException($"Alimento {dto.AlimentoId} ({dto.TipoTabela}) não encontrado.");
+        if (alimento == null) 
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new InvalidOperationException($"Alimento {dto.AlimentoId} ({dto.TipoTabela}) não encontrado.");
 
         var item = CriarItemComMacros(alimento, dto.AlimentoId, dto.TipoTabela, dto.QuantidadeG, dto.Ordem, dto.Observacoes);
 
@@ -782,6 +822,10 @@ public class PlanoAlimentarService : IPlanoAlimentar
     {
         var perfil = await _context.PerfilNutricional.FirstOrDefaultAsync(p => p.UserId == userId);
         if (perfil == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Perfil nutricional não encontrado. Crie o perfil antes de gerenciar planos alimentares.");
         return perfil;
     }
@@ -795,6 +839,10 @@ public class PlanoAlimentarService : IPlanoAlimentar
                 v.PacienteUserId == pacienteUserId &&
                 v.Status == EStatusVinculo.Ativo);
         if (!vinculoExiste)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new InvalidOperationException("Profissional não possui vínculo ativo com este paciente.");
     }
 }

@@ -21,7 +21,7 @@ public class UserController : ControllerBase
 
     private string GetUserId() =>
         User.FindFirstValue(ClaimTypes.NameIdentifier)
-        ?? throw new UnauthorizedAccessException("Usu�rio n�o autenticado.");
+        ?? throw new UnauthorizedAccessException("Usuario nao autenticado.");
 
     // ===================== PERFIL NUTRICIONAL =====================
 

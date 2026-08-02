@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Interfaces;
@@ -115,6 +116,10 @@ public class NutricionistaService : INutricionista
             .FirstOrDefaultAsync(p => p.UserId == userId);
 
         if (perfil == null)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new Exception("Perfil profissional não encontrado.");
 
         return new PerfilProfissionalDto

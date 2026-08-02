@@ -1,3 +1,6 @@
 <Solution>
-  <Project Path="nutra.api.csproj" />
+  <Project Path="nutra.api/nutra.api.csproj" />
+  <Project Path="nutra.core/nutra.core.csproj" />
+  <Project Path="nutra.data/nutra.data.csproj" />
+  <Project Path="nutra.test/nutra.test.csproj" />
 </Solution>

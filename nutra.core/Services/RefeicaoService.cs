@@ -26,7 +26,12 @@ public class RefeicaoService : IRefeicao
         
         var retorno = new RetornoPadrao();
 
-        if (alimentoInfo == null) throw new Exception("Alimento não encontrado");
+        if (alimentoInfo == null) 
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
+            throw new Exception("Alimento não encontrado");
 
         double baseReferencia = alimentoInfo.PorcaoReferencia > 0 ? alimentoInfo.PorcaoReferencia : 100.0;
         double fator = quantidadeIngeridaG / baseReferencia;

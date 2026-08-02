@@ -202,6 +202,10 @@ public class CalculadoraNutricionalService : ICalculadoraNutricional
         double[] dobras, int idade, EGeneroBiologico genero)
     {
         if (dobras == null || dobras.Length < 3)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new ArgumentException("São necessárias pelo menos 3 dobras cutâneas.");
 
         double soma = dobras[0] + dobras[1] + dobras[2];
@@ -235,6 +239,10 @@ public class CalculadoraNutricionalService : ICalculadoraNutricional
         double[] dobras, int idade, EGeneroBiologico genero)
     {
         if (dobras == null || dobras.Length < 7)
+            //TODO:
+            //Nao devemos jogar excecao
+            //retornar status codigo, bool e mensagem
+            //aqui o client que consome decide se redireciona ou nao
             throw new ArgumentException("São necessárias 7 dobras cutâneas para o protocolo JP7.");
 
         double soma = 0;
