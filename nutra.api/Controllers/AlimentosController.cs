@@ -17,7 +17,7 @@ using Nutra.Models.Alimentos;
 [Route("api/[controller]")]
 public class AlimentosController : ControllerBase
 {
-    private readonly AlimentosContext _context;
+    private readonly AlimentosContext _context; // TODO: Tirar daqui
 
     public AlimentosController(AlimentosContext context)
     {

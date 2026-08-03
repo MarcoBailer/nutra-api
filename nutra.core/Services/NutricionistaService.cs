@@ -1,6 +1,4 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Interfaces;
 using Nutra.Models;
@@ -11,17 +9,29 @@ namespace Nutra.Services;
 
 public class NutricionistaService : INutricionista
 {
-    private readonly IApplicationUserService _applicationUserService;
-    private readonly AlimentosContext _context;
+    private readonly IApplicationUserRepository _applicationUserService;
+    private readonly IPerfilProfissionalRepository _perfilProfissionalRepository;
+    private readonly IBaseRepository<Assinatura> _assinaturaRepository;
+    private readonly IClinicaRepository _clinicaRepository;
+    private readonly IVinculoPacienteProfissionalRepository _vinculoRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<NutricionistaService> _logger;
 
     public NutricionistaService(
-        IApplicationUserService applicationUserService,
-        AlimentosContext context,
+        IApplicationUserRepository applicationUserService,
+        IPerfilProfissionalRepository perfilProfissionalRepository,
+        IBaseRepository<Assinatura> assinaturaRepository,
+        IClinicaRepository clinicaRepository,
+        IVinculoPacienteProfissionalRepository vinculoRepository,
+        IUnitOfWork unitOfWork,
         ILogger<NutricionistaService> logger)
     {
         _applicationUserService = applicationUserService;
-        _context = context;
+        _perfilProfissionalRepository = perfilProfissionalRepository;
+        _assinaturaRepository = assinaturaRepository;
+        _clinicaRepository = clinicaRepository;
+        _vinculoRepository = vinculoRepository;
+        _unitOfWork = unitOfWork;
         _logger = logger;
     }
 
@@ -47,8 +57,8 @@ public class NutricionistaService : INutricionista
         else
         {
             // Se já existe mas já é nutricionista, retorna conflito
-            var perfilExistente = await _context.PerfisProfissionais
-                .AnyAsync(p => p.UserId == user.Id);
+            var perfilExistente = await _perfilProfissionalRepository
+                .ExistePorUsuarioIdAsync(user.Id);
 
             if (perfilExistente)
                 return RetornoPadrao.Conflito("Este usuário já possui um perfil profissional cadastrado.");
@@ -60,8 +70,8 @@ public class NutricionistaService : INutricionista
         }
 
         // Verifica unicidade do CRN
-        var crnExiste = await _context.PerfisProfissionais
-            .AnyAsync(p => p.CRN == dto.CRN);
+        var crnExiste = await _perfilProfissionalRepository
+            .ExistePorCrnAsync(dto.CRN);
 
         if (crnExiste)
             return RetornoPadrao.Conflito("Já existe um profissional cadastrado com este CRN.");
@@ -87,26 +97,26 @@ public class NutricionistaService : INutricionista
             ValorMensal = 0
         };
 
-        _context.PerfisProfissionais.Add(perfilProfissional);
-        _context.Assinaturas.Add(assinatura);
-        await _context.SaveChangesAsync();
+        _perfilProfissionalRepository.Add(perfilProfissional);
+        _assinaturaRepository.Add(assinatura);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Criado("Perfil profissional cadastrado com sucesso.");
     }
 
     public async Task<RetornoPadrao<PerfilProfissionalDto>> ObterPerfilProfissionalAsync(string userId)
     {
-        var perfil = await _context.PerfisProfissionais
-            .Include(p => p.User)
-            .Include(p => p.AssinaturaAtiva)
-            .Include(p => p.Clinicas.Where(c => c.Ativo))
-            .Include(p => p.Pacientes.Where(v => v.Status == EStatusVinculo.Ativo))
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilProfissionalRepository.ObterComUsuarioEAssinaturaAsync(userId);
 
         // Perfil ausente é primeiro acesso do profissional: o client redireciona ao cadastro.
         if (perfil == null)
             return RetornoPadrao<PerfilProfissionalDto>.NaoEncontrado(
                 "Perfil profissional não encontrado. Conclua o cadastro profissional primeiro.");
+
+        // Contagens vêm do banco: carregar as coleções inteiras só para chamar
+        // Count seria trazer linha por linha sem necessidade.
+        var totalPacientesAtivos = await _vinculoRepository.ContarAtivosPorPerfilAsync(perfil.Id);
+        var totalClinicas = await _clinicaRepository.ContarAtivasPorPerfilAsync(perfil.Id);
 
         var dto = new PerfilProfissionalDto
         {
@@ -122,10 +132,10 @@ public class NutricionistaService : INutricionista
             AnosExperiencia = perfil.AnosExperiencia,
             PlanoAtual = perfil.AssinaturaAtiva?.Plano ?? EPlanoAssinatura.Gratuito,
             StatusAssinatura = perfil.AssinaturaAtiva?.Status ?? EStatusAssinatura.Trial,
-            TotalPacientesAtivos = perfil.Pacientes.Count,
+            TotalPacientesAtivos = totalPacientesAtivos,
             MaxPacientes = perfil.MaxPacientes,
             MultiClinicaHabilitado = perfil.MultiClinicaHabilitado,
-            TotalClinicas = perfil.Clinicas.Count,
+            TotalClinicas = totalClinicas,
             CriadoEm = perfil.CriadoEm
         };
 
@@ -134,9 +144,7 @@ public class NutricionistaService : INutricionista
 
     public async Task<RetornoPadrao> AtualizarPerfilProfissionalAsync(string userId, UpdatePerfilProfissionalDto dto)
     {
-        var perfil = await _context.PerfisProfissionais
-            .Include(p => p.User)
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilProfissionalRepository.ObterComUsuarioEAssinaturaAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil profissional não encontrado.");
@@ -150,7 +158,7 @@ public class NutricionistaService : INutricionista
         perfil.AtualizadoEm = DateTime.UtcNow;
         perfil.User.AtualizadoEm = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Perfil profissional atualizado com sucesso.");
     }
@@ -159,15 +167,13 @@ public class NutricionistaService : INutricionista
 
     public async Task<RetornoPadrao> CriarClinicaAsync(string userId, ClinicaDto dto)
     {
-        var perfil = await _context.PerfisProfissionais
-            .Include(p => p.Clinicas.Where(c => c.Ativo))
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilProfissionalRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil profissional não encontrado.");
 
         // Limite do plano: 403 para o client oferecer upgrade em vez de tratar como erro de dados.
-        if (!perfil.MultiClinicaHabilitado && perfil.Clinicas.Any())
+        if (!perfil.MultiClinicaHabilitado && await _clinicaRepository.ContarAtivasPorPerfilAsync(perfil.Id) > 0)
             return RetornoPadrao.Proibido(
                 "Seu plano atual não permite múltiplas clínicas. Faça upgrade para o plano Enterprise.");
 
@@ -187,17 +193,15 @@ public class NutricionistaService : INutricionista
             CEP = dto.CEP
         };
 
-        _context.Clinicas.Add(clinica);
-        await _context.SaveChangesAsync();
+        _clinicaRepository.Add(clinica);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Criado("Clínica criada com sucesso.");
     }
 
     public async Task<RetornoPadrao> AtualizarClinicaAsync(string userId, int clinicaId, ClinicaDto dto)
     {
-        var clinica = await _context.Clinicas
-            .Include(c => c.PerfilProfissional)
-            .FirstOrDefaultAsync(c => c.Id == clinicaId && c.PerfilProfissional.UserId == userId);
+        var clinica = await _clinicaRepository.ObterPorIdEUsuarioAsync(clinicaId, userId);
 
         if (clinica == null)
             return RetornoPadrao.NaoEncontrado("Clínica não encontrada ou sem permissão.");
@@ -215,16 +219,14 @@ public class NutricionistaService : INutricionista
         clinica.CEP = dto.CEP;
         clinica.AtualizadoEm = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Clínica atualizada com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverClinicaAsync(string userId, int clinicaId)
     {
-        var clinica = await _context.Clinicas
-            .Include(c => c.PerfilProfissional)
-            .FirstOrDefaultAsync(c => c.Id == clinicaId && c.PerfilProfissional.UserId == userId);
+        var clinica = await _clinicaRepository.ObterPorIdEUsuarioAsync(clinicaId, userId);
 
         if (clinica == null)
             return RetornoPadrao.NaoEncontrado("Clínica não encontrada ou sem permissão.");
@@ -232,15 +234,16 @@ public class NutricionistaService : INutricionista
         clinica.Ativo = false;
         clinica.AtualizadoEm = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Clínica removida com sucesso.");
     }
 
     public async Task<RetornoPadrao<List<ClinicaDto>>> ListarClinicasAsync(string userId)
     {
-        var clinicas = await _context.Clinicas
-            .Where(c => c.PerfilProfissional.UserId == userId && c.Ativo)
+        var ativas = await _clinicaRepository.ListarAtivasPorUsuarioAsync(userId);
+
+        var clinicas = ativas
             .Select(c => new ClinicaDto
             {
                 Nome = c.Nome,
@@ -255,7 +258,7 @@ public class NutricionistaService : INutricionista
                 Estado = c.Estado,
                 CEP = c.CEP
             })
-            .ToListAsync();
+            .ToList();
 
         return RetornoPadrao<List<ClinicaDto>>.Ok(clinicas);
     }
@@ -264,15 +267,14 @@ public class NutricionistaService : INutricionista
 
     public async Task<RetornoPadrao> EnviarConvitePacienteAsync(string nutricionistaUserId, ConviteVinculoDto dto)
     {
-        var perfil = await _context.PerfisProfissionais
-            .Include(p => p.Pacientes.Where(v => v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente))
-            .FirstOrDefaultAsync(p => p.UserId == nutricionistaUserId);
+        var perfil = await _perfilProfissionalRepository.ObterPorUsuarioIdAsync(nutricionistaUserId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil profissional não encontrado.");
 
         // Limite do plano: 403 para o client oferecer upgrade.
-        if (perfil.Pacientes.Count >= perfil.MaxPacientes)
+        var pacientesEmAberto = await _vinculoRepository.ContarEmAbertoPorPerfilAsync(perfil.Id);
+        if (pacientesEmAberto >= perfil.MaxPacientes)
             return RetornoPadrao.Proibido(
                 $"Limite de pacientes atingido ({perfil.MaxPacientes}). Faça upgrade do seu plano.");
 
@@ -282,10 +284,8 @@ public class NutricionistaService : INutricionista
             return RetornoPadrao.NaoEncontrado("Paciente não encontrado com este e-mail.");
 
         // Verifica se já existe vínculo ativo ou pendente
-        var vinculoExistente = await _context.VinculosPacienteProfissional
-            .AnyAsync(v => v.PacienteUserId == paciente.Id
-                        && v.PerfilProfissionalId == perfil.Id
-                        && (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente));
+        var vinculoExistente = await _vinculoRepository
+            .ExisteVinculoEmAbertoPorPerfilAsync(perfil.Id, paciente.Id);
 
         if (vinculoExistente)
             return RetornoPadrao.Conflito("Já existe um vínculo ativo ou pendente com este paciente.");
@@ -293,8 +293,8 @@ public class NutricionistaService : INutricionista
         // Valida clínica (se informada)
         if (dto.ClinicaId.HasValue)
         {
-            var clinicaValida = await _context.Clinicas
-                .AnyAsync(c => c.Id == dto.ClinicaId.Value && c.PerfilProfissionalId == perfil.Id && c.Ativo);
+            var clinicaValida = await _clinicaRepository
+                .ExisteAtivaAsync(dto.ClinicaId.Value, perfil.Id);
 
             if (!clinicaValida)
                 return RetornoPadrao.NaoEncontrado("Clínica informada não encontrada ou sem permissão.");
@@ -310,8 +310,8 @@ public class NutricionistaService : INutricionista
             DataConvite = DateTime.UtcNow
         };
 
-        _context.VinculosPacienteProfissional.Add(vinculo);
-        await _context.SaveChangesAsync();
+        _vinculoRepository.Add(vinculo);
+        await _unitOfWork.SaveChangesAsync();
 
         _logger.LogInformation("Convite de vínculo enviado de {NutricionistaId} para {PacienteEmail}",
             nutricionistaUserId, dto.EmailPaciente);
@@ -321,10 +321,8 @@ public class NutricionistaService : INutricionista
 
     public async Task<RetornoPadrao> ResponderConviteAsync(string pacienteUserId, int vinculoId, bool aceitar)
     {
-        var vinculo = await _context.VinculosPacienteProfissional
-            .FirstOrDefaultAsync(v => v.Id == vinculoId
-                                   && v.PacienteUserId == pacienteUserId
-                                   && v.Status == EStatusVinculo.Pendente);
+        var vinculo = await _vinculoRepository
+            .ObterConvitePendenteAsync(vinculoId, pacienteUserId);
 
         if (vinculo == null)
             return RetornoPadrao.NaoEncontrado("Convite não encontrado ou já respondido.");
@@ -342,18 +340,15 @@ public class NutricionistaService : INutricionista
             mensagem = "Convite recusado.";
         }
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok(mensagem);
     }
 
     public async Task<RetornoPadrao> EncerrarVinculoAsync(string userId, int vinculoId)
     {
-        var vinculo = await _context.VinculosPacienteProfissional
-            .Include(v => v.Profissional)
-            .FirstOrDefaultAsync(v => v.Id == vinculoId
-                                   && (v.PacienteUserId == userId || v.Profissional.UserId == userId)
-                                   && v.Status == EStatusVinculo.Ativo);
+        var vinculo = await _vinculoRepository
+            .ObterVinculoAtivoDoParticipanteAsync(vinculoId, userId);
 
         if (vinculo == null)
             return RetornoPadrao.NaoEncontrado("Vínculo não encontrado ou já encerrado.");
@@ -361,18 +356,17 @@ public class NutricionistaService : INutricionista
         vinculo.Status = EStatusVinculo.Inativo;
         vinculo.DataEncerramento = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Vínculo encerrado com sucesso.");
     }
 
     public async Task<RetornoPadrao<List<PacienteResumoDto>>> ListarPacientesAsync(string nutricionistaUserId)
     {
-        var pacientes = await _context.VinculosPacienteProfissional
-            .Include(v => v.Paciente)
-            .Include(v => v.Clinica)
-            .Where(v => v.Profissional.UserId == nutricionistaUserId
-                     && (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente))
+        var vinculos = await _vinculoRepository
+            .ListarPacientesDoProfissionalAsync(nutricionistaUserId);
+
+        var pacientes = vinculos
             .Select(v => new PacienteResumoDto
             {
                 UserId = v.PacienteUserId,
@@ -380,22 +374,20 @@ public class NutricionistaService : INutricionista
                 Email = v.Paciente.Email,
                 StatusVinculo = v.Status,
                 DataVinculo = v.DataConvite,
-                Clinica = v.Clinica != null ? v.Clinica.Nome : null,
+                Clinica = v.Clinica?.Nome,
                 PerfilNutricionalCriado = v.Paciente.PerfilAtivo != null
             })
-            .ToListAsync();
+            .ToList();
 
         return RetornoPadrao<List<PacienteResumoDto>>.Ok(pacientes);
     }
 
     public async Task<RetornoPadrao<List<PacienteResumoDto>>> ListarNutricionistasAsync(string pacienteUserId)
     {
-        var nutricionistas = await _context.VinculosPacienteProfissional
-            .Include(v => v.Profissional)
-                .ThenInclude(p => p.User)
-            .Include(v => v.Clinica)
-            .Where(v => v.PacienteUserId == pacienteUserId
-                     && (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente))
+        var vinculos = await _vinculoRepository
+            .ListarProfissionaisDoPacienteAsync(pacienteUserId);
+
+        var nutricionistas = vinculos
             .Select(v => new PacienteResumoDto
             {
                 UserId = v.Profissional.UserId,
@@ -403,10 +395,10 @@ public class NutricionistaService : INutricionista
                 Email = v.Profissional.User.Email,
                 StatusVinculo = v.Status,
                 DataVinculo = v.DataConvite,
-                Clinica = v.Clinica != null ? v.Clinica.Nome : null,
+                Clinica = v.Clinica?.Nome,
                 PerfilNutricionalCriado = true
             })
-            .ToListAsync();
+            .ToList();
 
         return RetornoPadrao<List<PacienteResumoDto>>.Ok(nutricionistas);
     }
@@ -415,9 +407,7 @@ public class NutricionistaService : INutricionista
 
     public async Task<RetornoPadrao> AtualizarPlanoAsync(string userId, EPlanoAssinatura novoPlano)
     {
-        var perfil = await _context.PerfisProfissionais
-            .Include(p => p.AssinaturaAtiva)
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilProfissionalRepository.ObterComUsuarioEAssinaturaAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil profissional não encontrado.");
@@ -452,11 +442,11 @@ public class NutricionistaService : INutricionista
                 DataInicio = DateTime.UtcNow,
                 ValorMensal = valor
             };
-            _context.Assinaturas.Add(novaAssinatura);
+            _assinaturaRepository.Add(novaAssinatura);
         }
 
         perfil.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok($"Plano atualizado para {novoPlano} com sucesso.");
     }

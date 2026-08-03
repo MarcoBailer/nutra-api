@@ -57,7 +57,9 @@ public class ApplicationUser
     public bool Ativo { get; set; } = true;
 
     // --- Navegação ---
-    public PerfilNutricional? PerfilAtivo { get; set; }
+    // TODO: Verificar - mudar para obrigatório, se o usuário existe um perfil tem que existir;
+    // Se fizer dessa forma o perfil tem que existir antes da projeção local, no momento de criação da projeção local eu tenho que criar o perfil.
+    public PerfilNutricional? PerfilAtivo { get; set; } 
 
     /// <summary>
     /// Perfil profissional (preenchido se o usuário é nutricionista).

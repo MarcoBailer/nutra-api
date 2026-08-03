@@ -1,6 +1,3 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Internal;
-using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Interfaces;
 using Nutra.Models.Alimentos;
@@ -10,12 +7,21 @@ namespace Nutra.Services
 {
     public class BuscaService : IBusca
     {
-        private readonly IDbContextFactory<AlimentosContext> _contextFactory;
-        private readonly AlimentosContext _context;
-        public BuscaService(IDbContextFactory<AlimentosContext> contextFactory, AlimentosContext context)
+        private readonly IBaseRepository<Tbca> _tbcaRepository;
+        private readonly IBaseRepository<Fabricantes> _fabricanteRepository;
+        private readonly IBaseRepository<FastFood> _fastFoodRepository;
+        private readonly IBaseRepository<Genericos> _genericoRepository;
+
+        public BuscaService(
+            IBaseRepository<Tbca> tbcaRepository,
+            IBaseRepository<Fabricantes> fabricanteRepository,
+            IBaseRepository<FastFood> fastFoodRepository,
+            IBaseRepository<Genericos> genericoRepository)
         {
-            _contextFactory = contextFactory;
-            _context = context;
+            _tbcaRepository = tbcaRepository;
+            _fabricanteRepository = fabricanteRepository;
+            _fastFoodRepository = fastFoodRepository;
+            _genericoRepository = genericoRepository;
         }
         public async Task<List<AlimentoResumoDto>> BuscaAlimentoAsync(string termo)
         {
@@ -25,63 +31,19 @@ namespace Nutra.Services
 
             var resultadoFinal = new List<AlimentoResumoDto>();
 
-            var taskTbca = Task.Run(async () =>
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
+            // O limite vai junto na consulta: sem ele o Take aconteceria em memória,
+            // depois de trazer a tabela inteira que casa com o termo.
+            var tbcas = await _tbcaRepository.FindAsync(t => t.Nome != null && t.Nome.ToLower().Contains(termo), 20);
+            var fabs = await _fabricanteRepository.FindAsync(f => f.Produto != null && f.Produto.ToLower().Contains(termo), 10);
+            var fasts = await _fastFoodRepository.FindAsync(ff => ff.Produto != null && ff.Produto.ToLower().Contains(termo), 10);
+            var genericos = await _genericoRepository.FindAsync(g => g.Produto != null && g.Produto.ToLower().Contains(termo), 10);
 
-                var dados = await context.Tbcas
-                    .AsNoTracking()
-                    .Where(t => t.Nome != null && t.Nome.ToLower().Contains(termo))
-                    .Take(20)
-                    .ToListAsync();
-
-                return dados.Select(MapTbcaToDto);
-            });
-
-            var taskFab = Task.Run(async () =>
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
-                var dados = await context.Fabricantes
-                    .AsNoTracking()
-                    .Where(f => f.Produto != null && f.Produto.ToLower().Contains(termo))
-                    .Take(10)
-                    .ToListAsync();
-
-                return dados.Select(MapFabricanteToDto);
-            });
-
-            var taskFast = Task.Run(async () =>
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
-                var dados = await context.FastFoods
-                    .AsNoTracking()
-                    .Where(ff => ff.Produto != null && ff.Produto.ToLower().Contains(termo))
-                    .Take(10)
-                    .ToListAsync();
-
-                return dados.Select(MapFastFoodToDto);
-            });
-
-            var taskGenerico = Task.Run(async () =>
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
-                var dados = await context.Genericos
-                    .AsNoTracking()
-                    .Where(g => g.Produto != null && g.Produto.ToLower().Contains(termo))
-                    .Take(10)
-                    .ToListAsync();
-                return dados.Select(MapGenericoToDto);
-            });
-
-            await Task.WhenAll(taskTbca, taskFab, taskFast);
-
-            resultadoFinal.AddRange(taskTbca.Result);
-            resultadoFinal.AddRange(taskFab.Result);
-            resultadoFinal.AddRange(taskFast.Result);
-            resultadoFinal.AddRange(taskGenerico.Result);
+            resultadoFinal.AddRange(tbcas.Select(MapTbcaToDto));
+            resultadoFinal.AddRange(fabs.Select(MapFabricanteToDto));
+            resultadoFinal.AddRange(fasts.Select(MapFastFoodToDto));
+            resultadoFinal.AddRange(genericos.Select(MapGenericoToDto));
 
             return resultadoFinal.OrderBy(a => a.Nome.Length).ToList();
-
         }
 
         public async Task<AlimentoResumoDto?> BuscaAlimentoPorIdAsync(int id, ETipoTabela tabela)
@@ -91,8 +53,7 @@ namespace Nutra.Services
             switch (tabela)
             {
                 case ETipoTabela.Tbcas:
-                    var tbca = await _context.Tbcas
-                        .AsNoTracking()
+                    var tbca = await _tbcaRepository
                         .FirstOrDefaultAsync(x => x.Id == id);
                     if (tbca != null)
                     {
@@ -100,8 +61,7 @@ namespace Nutra.Services
                     }
                     break;
                 case ETipoTabela.Fabricantes:
-                    var fabricante = await _context.Fabricantes
-                        .AsNoTracking()
+                    var fabricante = await _fabricanteRepository
                         .FirstOrDefaultAsync(x => x.Id == id);
                     if (fabricante != null)
                     {
@@ -109,8 +69,7 @@ namespace Nutra.Services
                     }
                     break;
                 case ETipoTabela.FastFoods:
-                    var fastFood = await _context.FastFoods
-                        .AsNoTracking()
+                    var fastFood = await _fastFoodRepository
                         .FirstOrDefaultAsync(x => x.Id == id);
                     if (fastFood != null)
                     {
@@ -118,8 +77,7 @@ namespace Nutra.Services
                     }
                     break;
                 case ETipoTabela.Genericos:
-                    var generico = await _context.Genericos
-                        .AsNoTracking()
+                    var generico = await _genericoRepository
                         .FirstOrDefaultAsync(x => x.Id == id);
                     if (generico != null)
                     {

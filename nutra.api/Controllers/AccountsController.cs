@@ -12,12 +12,12 @@ namespace Nutra.Controllers;
 [Route("api/[controller]")]
 public class AccountsController : ControllerBase
 {
-    private readonly IApplicationUserService _applicationUserService;
+    private readonly IApplicationUserRepository _applicationUserService;
     private readonly IAccounts _accounts;
     private readonly INutricionista _nutricionista;
 
     public AccountsController(
-        IApplicationUserService applicationUserService,
+        IApplicationUserRepository applicationUserService,
         IAccounts accounts,
         INutricionista nutricionista)
     {

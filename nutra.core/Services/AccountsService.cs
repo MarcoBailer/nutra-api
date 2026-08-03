@@ -6,16 +6,16 @@ namespace Nutra.Services
 {
     public class AccountsService : IAccounts
     {
-        private readonly IApplicationUserService _applicationUserService;
+        private readonly IApplicationUserRepository _applicationUserRepository;
 
-        public AccountsService(IApplicationUserService applicationUserService)
+        public AccountsService(IApplicationUserRepository applicationUserService)
         {
-            _applicationUserService = applicationUserService;
+            _applicationUserRepository = applicationUserService;
         }
 
         public async Task<RetornoPadrao> AtualizarPerfilAsync(string userId, UpdateProfileDto dto)
         {
-            var user = await _applicationUserService.FindByIdAsync(userId);
+            var user = await _applicationUserRepository.FindByIdAsync(userId);
             if (user == null)
                 return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
@@ -34,7 +34,7 @@ namespace Nutra.Services
 
             user.AtualizadoEm = DateTime.UtcNow;
 
-            var updated = await _applicationUserService.UpdateAsync(user);
+            var updated = await _applicationUserRepository.UpdateAsync(user);
 
             if (!updated)
                 return RetornoPadrao.NaoEncontrado("Erro ao atualizar: usuário não encontrado.");
@@ -44,14 +44,14 @@ namespace Nutra.Services
 
         public async Task<RetornoPadrao> DesativarContaAsync(string userId)
         {
-            var user = await _applicationUserService.FindByIdAsync(userId);
+            var user = await _applicationUserRepository.FindByIdAsync(userId);
             if (user == null)
                 return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
             user.Ativo = false;
             user.AtualizadoEm = DateTime.UtcNow;
 
-            var updated = await _applicationUserService.UpdateAsync(user);
+            var updated = await _applicationUserRepository.UpdateAsync(user);
 
             return updated
                 ? RetornoPadrao.Ok("Conta desativada com sucesso.")
@@ -60,14 +60,14 @@ namespace Nutra.Services
 
         public async Task<RetornoPadrao> ReativarContaAsync(string userId)
         {
-            var user = await _applicationUserService.FindByIdAsync(userId);
+            var user = await _applicationUserRepository.FindByIdAsync(userId);
             if (user == null)
                 return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
             user.Ativo = true;
             user.AtualizadoEm = DateTime.UtcNow;
 
-            var updated = await _applicationUserService.UpdateAsync(user);
+            var updated = await _applicationUserRepository.UpdateAsync(user);
 
             return updated
                 ? RetornoPadrao.Ok("Conta reativada com sucesso.")

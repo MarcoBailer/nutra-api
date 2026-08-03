@@ -1,5 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Helper;
 using Nutra.Interfaces;
@@ -13,12 +11,32 @@ namespace Nutra.Services;
 
 public class DiarioAlimentarService : IDiarioAlimentar
 {
-    private readonly AlimentosContext _context;
+    private readonly IRegistroAlimentarRepository _registroRepository;
+    private readonly IFotoRefeicaoRepository _fotoRepository;
+    private readonly IVinculoPacienteProfissionalRepository _vinculoRepository;
+    private readonly IPerfilNutricionalRepository _perfilRepository;
+    private readonly IPlanoAlimentarRepository _planoRepository;
+    private readonly IMetaNutricionalRepository _metaRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IBusca _busca;
 
-    public DiarioAlimentarService(AlimentosContext context, IBusca busca)
+    public DiarioAlimentarService(
+        IRegistroAlimentarRepository registroRepository,
+        IFotoRefeicaoRepository fotoRepository,
+        IVinculoPacienteProfissionalRepository vinculoRepository,
+        IPerfilNutricionalRepository perfilRepository,
+        IPlanoAlimentarRepository planoRepository,
+        IMetaNutricionalRepository metaRepository,
+        IUnitOfWork unitOfWork,
+        IBusca busca)
     {
-        _context = context;
+        _registroRepository = registroRepository;
+        _fotoRepository = fotoRepository;
+        _vinculoRepository = vinculoRepository;
+        _perfilRepository = perfilRepository;
+        _planoRepository = planoRepository;
+        _metaRepository = metaRepository;
+        _unitOfWork = unitOfWork;
         _busca = busca;
     }
 
@@ -33,8 +51,8 @@ public class DiarioAlimentarService : IDiarioAlimentar
             return RetornoPadrao<RegistroConsumoResultadoDto>.NaoEncontrado("Alimento não encontrado.");
 
         var registro = CriarRegistroAlimentar(userId, alimento, dto);
-        _context.RegistroAlimentar.Add(registro);
-        await _context.SaveChangesAsync();
+        _registroRepository.Add(registro);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao<RegistroConsumoResultadoDto>.Criado(
             MapearRegistro(registro), "Consumo registrado com sucesso.");
@@ -56,11 +74,11 @@ public class DiarioAlimentarService : IDiarioAlimentar
             }
 
             var registro = CriarRegistroAlimentar(userId, alimento, item);
-            _context.RegistroAlimentar.Add(registro);
+            _registroRepository.Add(registro);
             resultados.Add(MapearRegistro(registro));
         }
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         // Itens ignorados são reportados: silenciar a truncagem faria o client
         // acreditar que registrou tudo.
@@ -73,13 +91,12 @@ public class DiarioAlimentarService : IDiarioAlimentar
 
     public async Task<RetornoPadrao> ExcluirRegistroAsync(string userId, long registroId)
     {
-        var registro = await _context.RegistroAlimentar
-            .FirstOrDefaultAsync(r => r.Id == registroId && r.UserId == userId);
+        var registro = await _registroRepository.ObterPorIdEUsuarioAsync(registroId, userId);
         if (registro == null)
             return RetornoPadrao.NaoEncontrado("Registro não encontrado.");
 
-        _context.RegistroAlimentar.Remove(registro);
-        await _context.SaveChangesAsync();
+        _registroRepository.Remove(registro);
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Ok("Registro excluído com sucesso.");
     }
 
@@ -99,8 +116,8 @@ public class DiarioAlimentarService : IDiarioAlimentar
             DataRegistro = DateTime.UtcNow
         };
 
-        _context.FotosRefeicao.Add(foto);
-        await _context.SaveChangesAsync();
+        _fotoRepository.Add(foto);
+        await _unitOfWork.SaveChangesAsync();
 
         var resultado = new FotoRefeicaoResultadoDto
         {
@@ -116,13 +133,12 @@ public class DiarioAlimentarService : IDiarioAlimentar
 
     public async Task<RetornoPadrao> RemoverFotoRefeicaoAsync(string userId, int fotoId)
     {
-        var foto = await _context.FotosRefeicao
-            .FirstOrDefaultAsync(f => f.Id == fotoId && f.UserId == userId);
+        var foto = await _fotoRepository.ObterPorIdEUsuarioAsync(fotoId, userId);
         if (foto == null)
             return RetornoPadrao.NaoEncontrado("Foto não encontrada.");
 
-        _context.FotosRefeicao.Remove(foto);
-        await _context.SaveChangesAsync();
+        _fotoRepository.Remove(foto);
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Ok("Foto removida com sucesso.");
     }
 
@@ -131,18 +147,10 @@ public class DiarioAlimentarService : IDiarioAlimentar
         var dataInicio = data.Date;
         var dataFim = dataInicio.AddDays(1);
 
-        var fotos = await _context.FotosRefeicao
-            .Where(f => f.UserId == userId && f.DataRegistro >= dataInicio && f.DataRegistro < dataFim)
-            .OrderBy(f => f.DataRegistro)
-            .Select(f => new FotoRefeicaoResultadoDto
-            {
-                Id = f.Id,
-                TipoRefeicao = f.TipoRefeicao,
-                FotoUrl = f.FotoUrl,
-                Descricao = f.Descricao,
-                DataRegistro = f.DataRegistro
-            })
-            .ToListAsync();
+        var registros = await _fotoRepository
+            .ListarPorUsuarioEPeriodoAsync(userId, dataInicio, dataFim);
+
+        var fotos = registros.Select(MapearFoto).ToList();
 
         return RetornoPadrao<List<FotoRefeicaoResultadoDto>>.Ok(fotos);
     }
@@ -195,12 +203,8 @@ public class DiarioAlimentarService : IDiarioAlimentar
             return RetornoPadrao<RelatorioAdesaoDto>.Invalido("Data fim deve ser posterior à data início.");
 
         // Validar vínculo
-        var vinculoExiste = await _context.VinculosPacienteProfissional
-            .Include(v => v.Profissional)
-            .AnyAsync(v =>
-                v.Profissional.UserId == profissionalUserId &&
-                v.PacienteUserId == pacienteUserId &&
-                (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente));
+        var vinculoExiste = await _vinculoRepository
+            .ExisteVinculoEmAbertoAsync(profissionalUserId, pacienteUserId);
         if (!vinculoExiste)
             return RetornoPadrao<RelatorioAdesaoDto>.Proibido(
                 "Profissional não possui vínculo com este paciente.");
@@ -220,36 +224,22 @@ public class DiarioAlimentarService : IDiarioAlimentar
         var diaFim = DateTimeHelper.EnsureUtcDateTime(diaInicio.AddDays(1));
 
         // Buscar registros alimentares do dia
-        var registros = await _context.RegistroAlimentar
-            .Where(r => r.UserId == userId && r.DataConsumo >= diaInicio && r.DataConsumo < diaFim)
-            .Include(r => r.ItemRefeicaoPlano)
-            .OrderBy(r => r.DataConsumo)
-            .ToListAsync();
+        var registros = (await _registroRepository
+            .ListarComItemPlanoPorUsuarioEPeriodoAsync(userId, diaInicio, diaFim)).ToList();
 
         // Buscar fotos do dia
-        var fotos = await _context.FotosRefeicao
-            .Where(f => f.UserId == userId && f.DataRegistro >= diaInicio && f.DataRegistro < diaFim)
-            .OrderBy(f => f.DataRegistro)
-            .ToListAsync();
+        var fotos = await _fotoRepository
+            .ListarPorUsuarioEPeriodoAsync(userId, diaInicio, diaFim);
 
         // Buscar plano ativo e suas refeições
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         PlanoAlimentar? planoAtivo = null;
-        if (perfil != null)
-        {
-            planoAtivo = await _context.PlanosAlimentares
-                .Include(p => p.RefeicoesPlanejadas).ThenInclude(r => r.Itens)
-                .FirstOrDefaultAsync(p => p.PerfilNutricionalId == perfil.Id && p.Status == EStatusPlano.Ativo);
-        }
-
-        // Buscar meta nutricional como fallback
         MetaNutricional? meta = null;
         if (perfil != null)
         {
-            meta = await _context.MetasNutricionais
-                .FirstOrDefaultAsync(m => m.PerfilNutricionalId == perfil.Id);
+            planoAtivo = await _planoRepository.ObterAtivoComRefeicoesEItensAsync(perfil.Id);
+            meta = await _metaRepository.ObterPorPerfilIdAsync(perfil.Id);
         }
 
         // Montar metas do dia
@@ -340,14 +330,7 @@ public class DiarioAlimentarService : IDiarioAlimentar
             },
             PercentualAderenciaCaloricas = aderenciaCaloricas,
             Refeicoes = refeicoes,
-            Fotos = fotos.Select(f => new FotoRefeicaoResultadoDto
-            {
-                Id = f.Id,
-                TipoRefeicao = f.TipoRefeicao,
-                FotoUrl = f.FotoUrl,
-                Descricao = f.Descricao,
-                DataRegistro = f.DataRegistro
-            }).ToList()
+            Fotos = fotos.Select(MapearFoto).ToList()
         };
     }
 
@@ -359,22 +342,18 @@ public class DiarioAlimentarService : IDiarioAlimentar
         int totalDias = (int)(dataFim.Date - dataInicio.Date).TotalDays + 1;
 
         // Buscar todos os registros no período
-        var registros = await _context.RegistroAlimentar
-            .Where(r => r.UserId == userId && r.DataConsumo >= inicio && r.DataConsumo < fim)
-            .ToListAsync();
+        var registros = (await _registroRepository
+            .ListarPorUsuarioEPeriodoAsync(userId, inicio, fim)).ToList();
 
         // Buscar perfil e meta
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         PlanoAlimentar? planoAtivo = null;
         MetaNutricional? meta = null;
         if (perfil != null)
         {
-            planoAtivo = await _context.PlanosAlimentares
-                .FirstOrDefaultAsync(p => p.PerfilNutricionalId == perfil.Id && p.Status == EStatusPlano.Ativo);
-            meta = await _context.MetasNutricionais
-                .FirstOrDefaultAsync(m => m.PerfilNutricionalId == perfil.Id);
+            planoAtivo = await _planoRepository.ObterAtivoPorPerfilAsync(perfil.Id);
+            meta = await _metaRepository.ObterPorPerfilIdAsync(perfil.Id);
         }
 
         double metaCal = planoAtivo?.CaloriasAlvoDiarias ?? meta?.CaloriasDiarias ?? 2000;
@@ -504,6 +483,18 @@ public class DiarioAlimentarService : IDiarioAlimentar
             PlanoAlimentarId = null, // Vinculado ao plano ativo se existir
             ItemRefeicaoPlanoId = dto.ItemRefeicaoPlanoId,
             CodigoBarras = dto.CodigoBarras
+        };
+    }
+
+    private static FotoRefeicaoResultadoDto MapearFoto(FotoRefeicao f)
+    {
+        return new FotoRefeicaoResultadoDto
+        {
+            Id = f.Id,
+            TipoRefeicao = f.TipoRefeicao,
+            FotoUrl = f.FotoUrl,
+            Descricao = f.Descricao,
+            DataRegistro = f.DataRegistro
         };
     }
 

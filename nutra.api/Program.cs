@@ -9,6 +9,7 @@ using Nutra.Middleware;
 using Nutra.Models.Usuario;
 using Nutra.Seeder;
 using Nutra.Services;
+using Nutra.Repository;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 
@@ -95,7 +96,7 @@ builder.Services.AddAuthentication(options =>
             authLogger.LogOpenIdEvent("JWT-TOKEN-VALIDATED", "Bearer token validado", sub);
 
             var userService = context.HttpContext.RequestServices
-                .GetRequiredService<IApplicationUserService>();
+                .GetRequiredService<IApplicationUserRepository>();
 
             var localUser = await EnsureLocalUserProjectionAsync(context.Principal, sub, userService, logger);
 
@@ -166,13 +167,38 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
+// ===== REPOSITÓRIOS =====
+// IBaseRepository<> aberto atende as entidades sem consulta própria
+// (Assinatura, RestricaoAlimentar, PerfilEquipamento, tabelas de alimentos).
+builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+builder.Services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
+
+builder.Services.AddScoped<IApplicationUserRepository, ApplicationUserRepository>();
+builder.Services.AddScoped<IPerfilNutricionalRepository, PerfilNutricionalRepository>();
+builder.Services.AddScoped<IMetaNutricionalRepository, MetaNutricionalRepository>();
+builder.Services.AddScoped<IPreferenciaAlimentarRepository, PreferenciaAlimentarRepository>();
+builder.Services.AddScoped<IHistoricoClinicoRepository, HistoricoClinicoRepository>();
+builder.Services.AddScoped<IRegistroBiometricoRepository, RegistroBiometricoRepository>();
+builder.Services.AddScoped<IAnamneseAlimentarRepository, AnamneseAlimentarRepository>();
+builder.Services.AddScoped<IAvaliacaoAntropometricaRepository, AvaliacaoAntropometricaRepository>();
+builder.Services.AddScoped<IFotoProgressoRepository, FotoProgressoRepository>();
+builder.Services.AddScoped<IPerfilProfissionalRepository, PerfilProfissionalRepository>();
+builder.Services.AddScoped<IClinicaRepository, ClinicaRepository>();
+builder.Services.AddScoped<IVinculoPacienteProfissionalRepository, VinculoPacienteProfissionalRepository>();
+builder.Services.AddScoped<IPlanoAlimentarRepository, PlanoAlimentarRepository>();
+builder.Services.AddScoped<IRefeicaoPlanoRepository, RefeicaoPlanoRepository>();
+builder.Services.AddScoped<IItemRefeicaoRepository, ItemRefeicaoRepository>();
+builder.Services.AddScoped<ISubstituicaoEquivalenteRepository, SubstituicaoEquivalenteRepository>();
+builder.Services.AddScoped<IModeloDietaRepository, ModeloDietaRepository>();
+builder.Services.AddScoped<IRegistroAlimentarRepository, RegistroAlimentarRepository>();
+builder.Services.AddScoped<IFotoRefeicaoRepository, FotoRefeicaoRepository>();
+
+// ===== SERVIÇOS =====
 builder.Services.AddScoped<IBusca, BuscaService>();
 builder.Services.AddScoped<ICalculadoraNutricional, CalculadoraNutricionalService>();
-builder.Services.AddScoped<IApplicationUserService, ApplicationUserService>();
 builder.Services.AddScoped<IUserProfile, UserProfileService>();
 builder.Services.AddScoped<IAccounts, AccountsService>();
 builder.Services.AddScoped<INutricionista, NutricionistaService>();
-builder.Services.AddScoped<IRefeicao, RefeicaoService>();
 builder.Services.AddScoped<IAvaliacaoNutricional, AvaliacaoNutricionalService>();
 builder.Services.AddScoped<IPlanoAlimentar, PlanoAlimentarService>();
 builder.Services.AddScoped<IDiarioAlimentar, DiarioAlimentarService>();
@@ -295,7 +321,7 @@ app.Run();
 static async Task<ApplicationUser> EnsureLocalUserProjectionAsync(
    ClaimsPrincipal principal,
    string sub,
-   IApplicationUserService userService,
+   IApplicationUserRepository userService,
    ILogger logger)
 {
     var email = principal.FindFirstValue("email");

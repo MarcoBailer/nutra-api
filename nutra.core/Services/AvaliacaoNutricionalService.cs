@@ -1,5 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Interfaces;
 using Nutra.Models;
@@ -14,13 +12,27 @@ namespace Nutra.Services;
 /// </summary>
 public class AvaliacaoNutricionalService : IAvaliacaoNutricional
 {
-    private readonly AlimentosContext _context;
+    private readonly IAvaliacaoAntropometricaRepository _avaliacaoRepository;
+    private readonly IPerfilNutricionalRepository _perfilRepository;
+    private readonly IVinculoPacienteProfissionalRepository _vinculoRepository;
+    private readonly IFotoProgressoRepository _fotoRepository;
     private readonly ICalculadoraNutricional _calculadora;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public AvaliacaoNutricionalService(AlimentosContext context, ICalculadoraNutricional calculadora)
+    public AvaliacaoNutricionalService(
+        IAvaliacaoAntropometricaRepository avaliacaoRepository,
+        IPerfilNutricionalRepository perfilRepository,
+        IVinculoPacienteProfissionalRepository vinculoRepository,
+        IFotoProgressoRepository fotoRepository,
+        ICalculadoraNutricional calculadora,
+        IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _avaliacaoRepository = avaliacaoRepository;
+        _perfilRepository = perfilRepository;
+        _vinculoRepository = vinculoRepository;
+        _fotoRepository = fotoRepository;
         _calculadora = calculadora;
+        _unitOfWork = unitOfWork;
     }
 
     // =====================================================================
@@ -36,12 +48,12 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
 
         var avaliacao = CriarEntidadeAvaliacao(perfil, dto, profissionalId: null);
 
-        _context.AvaliacoesAntropometricas.Add(avaliacao);
+        _avaliacaoRepository.Add(avaliacao);
 
         // Atualiza peso e medidas no perfil nutricional ativo
         AtualizarPerfilComAvaliacao(perfil, avaliacao);
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.Criado(
             MapearResultado(avaliacao, perfil), "Avaliação registrada com sucesso.");
@@ -55,14 +67,7 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         string profissionalUserId, string pacienteUserId, AvaliacaoAntropometricaDto dto)
     {
         // Verifica que o profissional tem vínculo ativo com o paciente
-        var vinculo = await _context.VinculosPacienteProfissional
-            .Include(v => v.Profissional)
-            .FirstOrDefaultAsync(v =>
-                v.Profissional.UserId == profissionalUserId &&
-                v.PacienteUserId == pacienteUserId &&
-                v.Status == EStatusVinculo.Ativo);
-
-        if (vinculo == null)
+        if (!await _vinculoRepository.ExisteVinculoAtivoAsync(profissionalUserId, pacienteUserId))
             return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.Proibido(
                 "Profissional não possui vínculo ativo com este paciente.");
 
@@ -73,10 +78,10 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
 
         var avaliacao = CriarEntidadeAvaliacao(perfil, dto, profissionalUserId);
 
-        _context.AvaliacoesAntropometricas.Add(avaliacao);
+        _avaliacaoRepository.Add(avaliacao);
         AtualizarPerfilComAvaliacao(perfil, avaliacao);
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.Criado(
             MapearResultado(avaliacao, perfil), "Avaliação registrada com sucesso.");
@@ -92,10 +97,8 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         if (perfil == null)
             return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.NaoEncontrado(PerfilAusente);
 
-        var avaliacao = await _context.AvaliacoesAntropometricas
-            .Include(a => a.FotosProgresso)
-            .Include(a => a.ProfissionalResponsavel)
-            .FirstOrDefaultAsync(a => a.Id == avaliacaoId && a.PerfilNutricionalId == perfil.Id);
+        var avaliacao = await _avaliacaoRepository
+            .ObterCompletaPorIdEPerfilAsync(avaliacaoId, perfil.Id);
 
         if (avaliacao == null)
             return RetornoPadrao<AvaliacaoAntropometricaResultadoDto>.NaoEncontrado("Avaliação não encontrada.");
@@ -113,69 +116,27 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         if (perfil == null)
             return RetornoPadrao<List<AvaliacaoResumoDto>>.NaoEncontrado(PerfilAusente);
 
-        var lista = await _context.AvaliacoesAntropometricas
-            .Where(a => a.PerfilNutricionalId == perfil.Id)
-            .OrderByDescending(a => a.DataAvaliacao)
-            .Select(a => new AvaliacaoResumoDto
-            {
-                Id = a.Id,
-                DataAvaliacao = a.DataAvaliacao,
-                PesoKg = a.PesoKg,
-                IMC = a.IMC,
-                ClassificacaoIMC = a.ClassificacaoIMC,
-                PercentualGordura = a.PercentualGorduraEstimado,
-                GET = a.GET,
-                PossuiBioimpedancia = a.PossuiBioimpedancia,
-                PossuiDobrasCutaneas = a.ProtocoloDobrasCutaneas != null,
-                TotalFotos = a.FotosProgresso.Count
-            })
-            .ToListAsync();
-
-        return RetornoPadrao<List<AvaliacaoResumoDto>>.Ok(lista);
+        return RetornoPadrao<List<AvaliacaoResumoDto>>.Ok(await ListarResumos(perfil.Id));
     }
 
     public async Task<RetornoPadrao<List<AvaliacaoResumoDto>>> ListarAvaliacoesDoPacienteAsync(
         string profissionalUserId, string pacienteUserId)
     {
         // Verifica vínculo
-        var vinculoExiste = await _context.VinculosPacienteProfissional
-            .Include(v => v.Profissional)
-            .AnyAsync(v =>
-                v.Profissional.UserId == profissionalUserId &&
-                v.PacienteUserId == pacienteUserId &&
-                (v.Status == EStatusVinculo.Ativo || v.Status == EStatusVinculo.Pendente));
+        var vinculoExiste = await _vinculoRepository
+            .ExisteVinculoEmAbertoAsync(profissionalUserId, pacienteUserId);
 
         if (!vinculoExiste)
             return RetornoPadrao<List<AvaliacaoResumoDto>>.Proibido(
                 "Profissional não possui vínculo com este paciente.");
 
-        var perfil = await _context.PerfilNutricional
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.UserId == pacienteUserId);
+        var perfil = await ObterPerfil(pacienteUserId);
 
         if (perfil == null)
             return RetornoPadrao<List<AvaliacaoResumoDto>>.NaoEncontrado(
                 "Paciente não possui perfil nutricional.");
 
-        var lista = await _context.AvaliacoesAntropometricas
-            .Where(a => a.PerfilNutricionalId == perfil.Id)
-            .OrderByDescending(a => a.DataAvaliacao)
-            .Select(a => new AvaliacaoResumoDto
-            {
-                Id = a.Id,
-                DataAvaliacao = a.DataAvaliacao,
-                PesoKg = a.PesoKg,
-                IMC = a.IMC,
-                ClassificacaoIMC = a.ClassificacaoIMC,
-                PercentualGordura = a.PercentualGorduraEstimado,
-                GET = a.GET,
-                PossuiBioimpedancia = a.PossuiBioimpedancia,
-                PossuiDobrasCutaneas = a.ProtocoloDobrasCutaneas != null,
-                TotalFotos = a.FotosProgresso.Count
-            })
-            .ToListAsync();
-
-        return RetornoPadrao<List<AvaliacaoResumoDto>>.Ok(lista);
+        return RetornoPadrao<List<AvaliacaoResumoDto>>.Ok(await ListarResumos(perfil.Id));
     }
 
     // =====================================================================
@@ -239,15 +200,13 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var avaliacao = await _context.AvaliacoesAntropometricas
-            .Include(a => a.FotosProgresso)
-            .FirstOrDefaultAsync(a => a.Id == avaliacaoId && a.PerfilNutricionalId == perfil.Id);
+        var avaliacao = await _avaliacaoRepository.ObterComFotosPorIdEPerfilAsync(avaliacaoId, perfil.Id);
 
         if (avaliacao == null)
             return RetornoPadrao.NaoEncontrado("Avaliação não encontrada.");
 
-        _context.AvaliacoesAntropometricas.Remove(avaliacao);
-        await _context.SaveChangesAsync();
+        _avaliacaoRepository.Remove(avaliacao);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Avaliação excluída com sucesso.");
     }
@@ -262,8 +221,8 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var avaliacao = await _context.AvaliacoesAntropometricas
-            .FirstOrDefaultAsync(a => a.Id == avaliacaoId && a.PerfilNutricionalId == perfil.Id);
+        var avaliacao = await _avaliacaoRepository
+            .ObterComFotosPorIdEPerfilAsync(avaliacaoId, perfil.Id);
 
         if (avaliacao == null)
             return RetornoPadrao.NaoEncontrado("Avaliação não encontrada.");
@@ -279,7 +238,7 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
             });
         }
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Criado($"{fotos.Count} foto(s) adicionada(s) com sucesso.");
     }
 
@@ -289,15 +248,13 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var foto = await _context.FotosProgresso
-            .Include(f => f.AvaliacaoAntropometrica)
-            .FirstOrDefaultAsync(f => f.Id == fotoId && f.AvaliacaoAntropometrica.PerfilNutricionalId == perfil.Id);
+        var foto = await _fotoRepository.ObterPorIdEPerfilAsync(fotoId, perfil.Id);
 
         if (foto == null)
             return RetornoPadrao.NaoEncontrado("Foto não encontrada.");
 
-        _context.FotosProgresso.Remove(foto);
-        await _context.SaveChangesAsync();
+        _fotoRepository.Remove(foto);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Foto removida com sucesso.");
     }
@@ -709,7 +666,32 @@ public class AvaliacaoNutricionalService : IAvaliacaoNutricional
     /// o status HTTP é o método público.
     /// </summary>
     private Task<PerfilNutricional?> ObterPerfil(string userId) =>
-        _context.PerfilNutricional.FirstOrDefaultAsync(p => p.UserId == userId);
+        _perfilRepository.ObterPorUsuarioIdAsync(userId);
+
+    /// <summary>
+    /// Mapeamento entidade → resumo. Mora no serviço, não no repositório: DTO é
+    /// contrato do core, e nutra.data não conhece o core.
+    /// </summary>
+    private async Task<List<AvaliacaoResumoDto>> ListarResumos(int perfilId)
+    {
+        var avaliacoes = await _avaliacaoRepository.ListarPorPerfilAsync(perfilId);
+
+        return avaliacoes
+            .Select(a => new AvaliacaoResumoDto
+            {
+                Id = a.Id,
+                DataAvaliacao = a.DataAvaliacao,
+                PesoKg = a.PesoKg,
+                IMC = a.IMC,
+                ClassificacaoIMC = a.ClassificacaoIMC,
+                PercentualGordura = a.PercentualGorduraEstimado,
+                GET = a.GET,
+                PossuiBioimpedancia = a.PossuiBioimpedancia,
+                PossuiDobrasCutaneas = a.ProtocoloDobrasCutaneas != null,
+                TotalFotos = a.FotosProgresso.Count
+            })
+            .ToList();
+    }
 
     private const string PerfilAusente =
         "Perfil nutricional não encontrado. Crie o perfil antes de registrar uma avaliação.";

@@ -15,8 +15,10 @@ public class PerfilNutricional
 
     public int? MetaNutricionalAtualId { get; set; }
 
+    // TODO: Verificar - Transformar em obrigatório, deve ser criado junto do perfil. Usuário nasce -> perfil nasce -> meta nasce
+    // Se for obrigatório a Meta precisa ser criado antes do perfil.
     [ForeignKey("MetaNutricionalAtualId")]
-    public MetaNutricional? MetaNutricional { get; set; }
+    public MetaNutricional? MetaNutricional { get; set; } 
 
     // --- Medidas corporais ---
     public double AlturaCm { get; set; }

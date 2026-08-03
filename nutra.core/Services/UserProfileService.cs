@@ -1,5 +1,3 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Helper;
 using Nutra.Interfaces;
@@ -12,38 +10,67 @@ namespace Nutra.Services;
 
 public class UserProfileService : IUserProfile
 {
-    private readonly IApplicationUserService _applicationUserService;
+    private readonly IApplicationUserRepository _applicationUserService;
     private readonly ICalculadoraNutricional _calculadora;
     private readonly IBusca _busca;
-    private readonly AlimentosContext _context;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IPerfilNutricionalRepository _perfilRepository;
+    private readonly IMetaNutricionalRepository _metaRepository;
+    private readonly IBaseRepository<RestricaoAlimentar> _restricaoRepository;
+    private readonly IBaseRepository<PerfilEquipamento> _equipamentoRepository;
+    private readonly IHistoricoClinicoRepository _historicoRepository;
+    private readonly IPreferenciaAlimentarRepository _preferenciaRepository;
+    private readonly IRegistroBiometricoRepository _biometricoRepository;
+    private readonly IAnamneseAlimentarRepository _anamneseRepository;
 
-    public UserProfileService(IApplicationUserService applicationUserService,
-        AlimentosContext context,
+    public UserProfileService(
+        IApplicationUserRepository applicationUserService,
         ICalculadoraNutricional calculadora,
-        IBusca busca
-        )
+        IBusca busca,
+        IUnitOfWork unitOfWork,
+        IPerfilNutricionalRepository perfilRepository,
+        IMetaNutricionalRepository metaRepository,
+        IBaseRepository<RestricaoAlimentar> restricaoRepository,
+        IBaseRepository<PerfilEquipamento> equipamentoRepository,
+        IHistoricoClinicoRepository historicoRepository,
+        IPreferenciaAlimentarRepository preferenciaRepository,
+        IRegistroBiometricoRepository biometricoRepository,
+        IAnamneseAlimentarRepository anamneseRepository)
     {
         _applicationUserService = applicationUserService;
-        _context = context;
         _calculadora = calculadora;
         _busca = busca;
+        _unitOfWork = unitOfWork;
+        _perfilRepository = perfilRepository;
+        _metaRepository = metaRepository;
+        _restricaoRepository = restricaoRepository;
+        _equipamentoRepository = equipamentoRepository;
+        _historicoRepository = historicoRepository;
+        _preferenciaRepository = preferenciaRepository;
+        _biometricoRepository = biometricoRepository;
+        _anamneseRepository = anamneseRepository;
     }
 
     // ===================== PERFIL NUTRICIONAL =====================
 
     public async Task<RetornoPadrao> PostPerfilNutricional(PerfilNutricionalDto perfil)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
             var user = await _applicationUserService.FindByEmailAsync(perfil.UserEmail);
             if (user == null)
+            {
+                await _unitOfWork.RollbackAsync();
                 return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
+            }
 
-            bool perfilJaExiste = _context.PerfilNutricional.Any(p => p.User.Email == perfil.UserEmail);
-            if (perfilJaExiste)
+            if (await _perfilRepository.ExistePorEmailAsync(perfil.UserEmail))
+            {
+                await _unitOfWork.RollbackAsync();
                 return RetornoPadrao.Conflito("Perfil nutricional já existe para este usuário.");
+            }
 
             var registroInicial = new RegistroBiometrico
             {
@@ -113,43 +140,42 @@ public class UserProfileService : IUserProfile
                 },
             };
 
-            _context.PerfilNutricional.Add(novoPerfil);
-            await _context.SaveChangesAsync();
+            _perfilRepository.Add(novoPerfil);
+            await _unitOfWork.SaveChangesAsync();
 
 
             var metaNutricional = _calculadora.GerarMetaInicial(novoPerfil);
             metaNutricional.PerfilNutricionalId = novoPerfil.Id;
-            _context.MetasNutricionais.Add(metaNutricional);
-            await _context.SaveChangesAsync();
+            _metaRepository.Add(metaNutricional);
+            await _unitOfWork.SaveChangesAsync();
 
             novoPerfil.MetaNutricionalAtualId = metaNutricional.Id;
-            await _context.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync();
 
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitAsync();
 
             return RetornoPadrao.Criado("Perfil nutricional criado com sucesso.");
         }
         catch (Exception)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             throw;
         }
     }
 
     public async Task<RetornoPadrao> AtualizarPerfilNutricional(string userId, PerfilNutricionalDto dto)
     {
-        using var transaction = await _context.Database.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
-            var perfil = await _context.PerfilNutricional
-                .Include(p => p.RestricoesAlimentares)
-                .Include(p => p.EquipamentoDisponivel)
-                .Include(p => p.HistoricosClinico)
-                .FirstOrDefaultAsync(p => p.UserId == userId);
+            var perfil = await _perfilRepository.ObterComColecoesAsync(userId);
 
             if (perfil == null)
+            {
+                await _unitOfWork.RollbackAsync();
                 return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado para o usuário.");
+            }
 
             // Atualiza campos simples
             perfil.AlturaCm = dto.AlturaCm;
@@ -178,7 +204,7 @@ public class UserProfileService : IUserProfile
             perfil.AtualizadoEm = DateTime.UtcNow;
 
             // Atualiza restrições (remove e recria)
-            _context.RestricaoAlimentar.RemoveRange(perfil.RestricoesAlimentares);
+            _restricaoRepository.RemoveRange(perfil.RestricoesAlimentares);
             perfil.RestricoesAlimentares = dto.RestricoesIds
                 .Select(alergiaEnum => new RestricaoAlimentar
                 {
@@ -187,7 +213,7 @@ public class UserProfileService : IUserProfile
                 }).ToList();
 
             // Atualiza equipamentos (remove e recria)
-            _context.PerfisEquipamentos.RemoveRange(perfil.EquipamentoDisponivel);
+            _equipamentoRepository.RemoveRange(perfil.EquipamentoDisponivel);
             perfil.EquipamentoDisponivel = dto.EquipamentosIds
                 .Select(enumValue => new PerfilEquipamento
                 {
@@ -196,7 +222,7 @@ public class UserProfileService : IUserProfile
                 }).ToList();
 
             // Atualiza histórico clínico (remove e recria)
-            _context.HistoricoClinicos.RemoveRange(perfil.HistoricosClinico);
+            _historicoRepository.RemoveRange(perfil.HistoricosClinico);
             perfil.HistoricosClinico = dto.HistoricoClinicos
                 .Select(hc => new HistoricoClinico
                 {
@@ -212,19 +238,19 @@ public class UserProfileService : IUserProfile
             // Recalcula meta nutricional
             var novaMeta = _calculadora.GerarMetaInicial(perfil);
             novaMeta.PerfilNutricionalId = perfil.Id;
-            _context.MetasNutricionais.Add(novaMeta);
-            await _context.SaveChangesAsync();
+            _metaRepository.Add(novaMeta);
+            await _unitOfWork.SaveChangesAsync();
 
             perfil.MetaNutricionalAtualId = novaMeta.Id;
 
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitAsync();
 
             return RetornoPadrao.Ok("Perfil nutricional atualizado com sucesso.");
         }
         catch (Exception)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackAsync();
             throw;
         }
     }
@@ -233,8 +259,7 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao> PostPreferenciaAlimentar(string userId, int id, ETipoTabela tabela, ETipoPreferencia afinidade)
     {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado para o usuário.");
@@ -245,10 +270,8 @@ public class UserProfileService : IUserProfile
             return RetornoPadrao.NaoEncontrado("Alimento não encontrado.");
 
         // Verifica se já existe preferência para este alimento
-        var existente = await _context.PreferenciaAlimentar
-            .FirstOrDefaultAsync(p => p.PerfilNutricionalId == perfil.Id
-                                   && p.AlimentoId == id
-                                   && p.Tabela == tabela);
+        var existente = await _preferenciaRepository
+            .ObterPorPerfilEAlimentoAsync(perfil.Id, id, tabela);
 
         string mensagem;
         if (existente != null)
@@ -266,26 +289,25 @@ public class UserProfileService : IUserProfile
                 Tabela = tabela,
                 Tipo = afinidade
             };
-            _context.PreferenciaAlimentar.Add(preferencia);
+            _preferenciaRepository.Add(preferencia);
             mensagem = "Preferência alimentar registrada com sucesso.";
         }
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok(mensagem);
     }
 
     public async Task<RetornoPadrao> RemoverPreferenciaAlimentar(string userId, int preferenciaId)
     {
-        var preferencia = await _context.PreferenciaAlimentar
-            .Include(p => p.Perfil)
-            .FirstOrDefaultAsync(p => p.Id == preferenciaId && p.Perfil.UserId == userId);
+        var preferencia = await _preferenciaRepository
+            .ObterPorIdEUsuarioAsync(preferenciaId, userId);
 
         if (preferencia == null)
             return RetornoPadrao.NaoEncontrado("Preferência alimentar não encontrada.");
 
-        _context.PreferenciaAlimentar.Remove(preferencia);
-        await _context.SaveChangesAsync();
+        _preferenciaRepository.Remove(preferencia);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Preferência alimentar removida com sucesso.");
     }
@@ -298,8 +320,7 @@ public class UserProfileService : IUserProfile
         if (user == null)
             return RetornoPadrao.NaoEncontrado("Usuário não encontrado.");
 
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado para o usuário.");
@@ -322,31 +343,30 @@ public class UserProfileService : IUserProfile
 
         perfil.AtualizadoEm = DateTime.UtcNow;
 
-        _context.RegistroBiometrico.Add(novoRegistroBiometrico);
-        await _context.SaveChangesAsync();
+        _biometricoRepository.Add(novoRegistroBiometrico);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Criado("Registro biométrico adicionado com sucesso.");
     }
 
     public async Task<RetornoPadrao<List<RegistroBiometricoDto>>> ListarHistoricoBiometrico(string userId)
     {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao<List<RegistroBiometricoDto>>.NaoEncontrado(
                 "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
-        var historico = await _context.RegistroBiometrico
-            .Where(r => r.PerfilNutricionalId == perfil.Id)
-            .OrderByDescending(r => r.Data)
+        var registros = await _biometricoRepository.ListarPorPerfilAsync(perfil.Id);
+
+        var historico = registros
             .Select(r => new RegistroBiometricoDto
             {
                 PesoKg = r.PesoKg,
                 PercentualGordura = r.PercentualGordura,
                 CircunferenciaCinturaCm = r.CircunferenciaCinturaCm
             })
-            .ToListAsync();
+            .ToList();
 
         return RetornoPadrao<List<RegistroBiometricoDto>>.Ok(historico);
     }
@@ -355,8 +375,7 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao> AdicionarHistoricoClinico(string userId, HistoricoClinicoDto dto)
     {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado.");
@@ -372,17 +391,15 @@ public class UserProfileService : IUserProfile
             Observacoes = dto.Observacoes
         };
 
-        _context.HistoricoClinicos.Add(historico);
-        await _context.SaveChangesAsync();
+        _historicoRepository.Add(historico);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Criado("Condição clínica registrada com sucesso.");
     }
 
     public async Task<RetornoPadrao> AtualizarHistoricoClinico(string userId, int id, HistoricoClinicoDto dto)
     {
-        var historico = await _context.HistoricoClinicos
-            .Include(h => h.PerfilNutricional)
-            .FirstOrDefaultAsync(h => h.Id == id && h.PerfilNutricional.UserId == userId);
+        var historico = await _historicoRepository.ObterPorIdEUsuarioAsync(id, userId);
 
         if (historico == null)
             return RetornoPadrao.NaoEncontrado("Registro clínico não encontrado.");
@@ -395,38 +412,35 @@ public class UserProfileService : IUserProfile
         historico.Observacoes = dto.Observacoes;
         historico.AtualizadoEm = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Registro clínico atualizado com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverHistoricoClinico(string userId, int id)
     {
-        var historico = await _context.HistoricoClinicos
-            .Include(h => h.PerfilNutricional)
-            .FirstOrDefaultAsync(h => h.Id == id && h.PerfilNutricional.UserId == userId);
+        var historico = await _historicoRepository.ObterPorIdEUsuarioAsync(id, userId);
 
         if (historico == null)
             return RetornoPadrao.NaoEncontrado("Registro clínico não encontrado.");
 
-        _context.HistoricoClinicos.Remove(historico);
-        await _context.SaveChangesAsync();
+        _historicoRepository.Remove(historico);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Registro clínico removido com sucesso.");
     }
 
     public async Task<RetornoPadrao<List<HistoricoClinicoDto>>> ListarHistoricoClinico(string userId)
     {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao<List<HistoricoClinicoDto>>.NaoEncontrado(
                 "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
-        var historicos = await _context.HistoricoClinicos
-            .Where(h => h.PerfilNutricionalId == perfil.Id)
-            .OrderByDescending(h => h.CriadoEm)
+        var registros = await _historicoRepository.ListarPorPerfilAsync(perfil.Id);
+
+        var historicos = registros
             .Select(h => new HistoricoClinicoDto
             {
                 Condicao = h.Condicao,
@@ -436,7 +450,7 @@ public class UserProfileService : IUserProfile
                 MedicamentosEmUso = h.MedicamentosEmUso,
                 Observacoes = h.Observacoes
             })
-            .ToListAsync();
+            .ToList();
 
         return RetornoPadrao<List<HistoricoClinicoDto>>.Ok(historicos);
     }
@@ -445,8 +459,7 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao> SalvarAnamneseAlimentar(string userId, AnamneseAlimentarDto dto)
     {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado("Perfil nutricional não encontrado.");
@@ -484,25 +497,21 @@ public class UserProfileService : IUserProfile
             ObservacoesGerais = dto.ObservacoesGerais
         };
 
-        _context.AnamnesesAlimentares.Add(anamnese);
-        await _context.SaveChangesAsync();
+        _anamneseRepository.Add(anamnese);
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Criado("Anamnese alimentar registrada com sucesso.");
     }
 
     public async Task<RetornoPadrao<AnamneseAlimentarDto>> ObterUltimaAnamnese(string userId)
     {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao<AnamneseAlimentarDto>.NaoEncontrado(
                 "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
-        var anamnese = await _context.AnamnesesAlimentares
-            .Where(a => a.PerfilNutricionalId == perfil.Id)
-            .OrderByDescending(a => a.DataPreenchimento)
-            .FirstOrDefaultAsync();
+        var anamnese = await _anamneseRepository.ObterUltimaPorPerfilAsync(perfil.Id);
 
         if (anamnese == null)
             return RetornoPadrao<AnamneseAlimentarDto>.NaoEncontrado("Nenhuma anamnese encontrada.");
@@ -512,18 +521,15 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao<List<AnamneseAlimentarDto>>> ListarAnamneses(string userId)
     {
-        var perfil = await _context.PerfilNutricional
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
         if (perfil == null)
             return RetornoPadrao<List<AnamneseAlimentarDto>>.NaoEncontrado(
                 "Perfil nutricional não encontrado. Conclua o onboarding primeiro.");
 
-        var anamneses = await _context.AnamnesesAlimentares
-            .Where(a => a.PerfilNutricionalId == perfil.Id)
-            .OrderByDescending(a => a.DataPreenchimento)
-            .Select(a => MapAnamneseToDto(a))
-            .ToListAsync();
+        var registros = await _anamneseRepository.ListarPorPerfilAsync(perfil.Id);
+
+        var anamneses = registros.Select(MapAnamneseToDto).ToList();
 
         return RetornoPadrao<List<AnamneseAlimentarDto>>.Ok(anamneses);
     }
@@ -532,12 +538,7 @@ public class UserProfileService : IUserProfile
 
     public async Task<RetornoPadrao<PerfilNutricionalDto>> GetPerfilNutricional(string userId)
     {
-        var perfil = await _context.PerfilNutricional
-            .Include(p => p.RestricoesAlimentares)
-            .Include(p => p.EquipamentoDisponivel)
-            .Include(p => p.PreferenciasAlimentares)
-            .Include(p => p.HistoricosClinico)
-            .FirstOrDefaultAsync(p => p.UserId == userId);
+        var perfil = await _perfilRepository.ObterComColecoesAsync(userId);
 
         // Perfil ausente é o caso de primeiro acesso: 404 para o client redirecionar ao onboarding.
         if (perfil == null)

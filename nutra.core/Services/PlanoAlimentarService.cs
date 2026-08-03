@@ -1,5 +1,3 @@
-using Microsoft.EntityFrameworkCore;
-using Nutra.Data;
 using Nutra.Enum;
 using Nutra.Interfaces;
 using Nutra.Models;
@@ -11,13 +9,39 @@ namespace Nutra.Services;
 
 public class PlanoAlimentarService : IPlanoAlimentar
 {
-    private readonly AlimentosContext _context;
+    private readonly IPlanoAlimentarRepository _planoRepository;
+    private readonly IRefeicaoPlanoRepository _refeicaoRepository;
+    private readonly IItemRefeicaoRepository _itemRefeicaoRepository;
+    private readonly ISubstituicaoEquivalenteRepository _substituicaoRepository;
+    private readonly IModeloDietaRepository _modeloDietaRepository;
+    private readonly IMetaNutricionalRepository _metaRepository;
+    private readonly IPerfilNutricionalRepository _perfilRepository;
+    private readonly IVinculoPacienteProfissionalRepository _vinculoRepository;
     private readonly IBusca _busca;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public PlanoAlimentarService(AlimentosContext context, IBusca busca)
+    public PlanoAlimentarService(
+        IPlanoAlimentarRepository planoRepository,
+        IRefeicaoPlanoRepository refeicaoRepository,
+        IItemRefeicaoRepository itemRefeicaoRepository,
+        ISubstituicaoEquivalenteRepository substituicaoRepository,
+        IModeloDietaRepository modeloDietaRepository,
+        IMetaNutricionalRepository metaRepository,
+        IPerfilNutricionalRepository perfilRepository,
+        IVinculoPacienteProfissionalRepository vinculoRepository,
+        IBusca busca,
+        IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _planoRepository = planoRepository;
+        _refeicaoRepository = refeicaoRepository;
+        _itemRefeicaoRepository = itemRefeicaoRepository;
+        _substituicaoRepository = substituicaoRepository;
+        _modeloDietaRepository = modeloDietaRepository;
+        _metaRepository = metaRepository;
+        _perfilRepository = perfilRepository;
+        _vinculoRepository = vinculoRepository;
         _busca = busca;
+        _unitOfWork = unitOfWork;
     }
 
     // ============================================================
@@ -35,8 +59,8 @@ public class PlanoAlimentarService : IPlanoAlimentar
             return RetornoPadrao<PlanoAlimentarResultadoDto>.Falha(planoRetorno);
 
         var plano = planoRetorno.Dados!;
-        _context.PlanosAlimentares.Add(plano);
-        await _context.SaveChangesAsync();
+        _planoRepository.Add(plano);
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
             await MapearPlanoResultado(plano), "Plano alimentar criado com sucesso.");
     }
@@ -58,16 +82,15 @@ public class PlanoAlimentarService : IPlanoAlimentar
             return RetornoPadrao<PlanoAlimentarResultadoDto>.Falha(planoRetorno);
 
         var plano = planoRetorno.Dados!;
-        _context.PlanosAlimentares.Add(plano);
-        await _context.SaveChangesAsync();
+        _planoRepository.Add(plano);
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
             await MapearPlanoResultado(plano), "Plano alimentar criado com sucesso.");
     }
 
     public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> ObterPlanoAsync(string userId, int planoId)
     {
-        var plano = await CarregarPlanoCompleto()
-            .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricional.UserId == userId);
+        var plano = await _planoRepository.ObterCompletoPorIdEUsuarioAsync(planoId, userId);
         if (plano == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Plano alimentar não encontrado.");
 
@@ -76,8 +99,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
 
     public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> ObterPlanoAtivoAsync(string userId)
     {
-        var plano = await CarregarPlanoCompleto()
-            .FirstOrDefaultAsync(p => p.PerfilNutricional.UserId == userId && p.Status == EStatusPlano.Ativo);
+        var plano = await _planoRepository.ObterCompletoAtivoPorUsuarioAsync(userId);
         if (plano == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(
                 "Nenhum plano alimentar ativo encontrado.");
@@ -91,9 +113,9 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao<List<PlanoAlimentarResumoDto>>.NaoEncontrado(PerfilAusente);
 
-        var planos = await _context.PlanosAlimentares
-            .Where(p => p.PerfilNutricionalId == perfil.Id)
-            .OrderByDescending(p => p.CriadoEm)
+        var entidades = await _planoRepository.ListarPorPerfilAsync(perfil.Id);
+
+        var planos = entidades
             .Select(p => new PlanoAlimentarResumoDto
             {
                 Id = p.Id,
@@ -104,10 +126,10 @@ public class PlanoAlimentarService : IPlanoAlimentar
                 CaloriasAlvoDiarias = p.CaloriasAlvoDiarias,
                 TotalRefeicoes = p.RefeicoesPlanejadas.Count,
                 TotalItens = p.RefeicoesPlanejadas.SelectMany(r => r.Itens).Count(),
-                ProfissionalResponsavel = p.ProfissionalResponsavel != null ? p.ProfissionalResponsavel.NomeCompleto : null,
+                ProfissionalResponsavel = p.ProfissionalResponsavel?.NomeCompleto,
                 CriadoEm = p.CriadoEm
             })
-            .ToListAsync();
+            .ToList();
 
         return RetornoPadrao<List<PlanoAlimentarResumoDto>>.Ok(planos);
     }
@@ -119,8 +141,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
 
-        var plano = await CarregarPlanoCompleto()
-            .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
+        var plano = await _planoRepository.ObterCompletoPorIdEPerfilAsync(planoId, perfil.Id);
         if (plano == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Plano alimentar não encontrado.");
 
@@ -131,7 +152,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (dto.Observacoes != null) plano.Observacoes = dto.Observacoes;
         plano.AtualizadoEm = DateTime.UtcNow;
 
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao<PlanoAlimentarResultadoDto>.Ok(
             await MapearPlanoResultado(plano), "Plano alimentar atualizado com sucesso.");
     }
@@ -142,16 +163,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var plano = await _context.PlanosAlimentares
-            .Include(p => p.RefeicoesPlanejadas)
-                .ThenInclude(r => r.Itens)
-                    .ThenInclude(i => i.SubstituicoesEquivalentes)
-            .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
+        var plano = await _planoRepository.ObterCompletoPorIdEPerfilAsync(planoId, perfil.Id);
         if (plano == null)
             return RetornoPadrao.NaoEncontrado("Plano alimentar não encontrado.");
 
-        _context.PlanosAlimentares.Remove(plano);
-        await _context.SaveChangesAsync();
+        _planoRepository.Remove(plano);
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Ok("Plano alimentar excluído com sucesso.");
     }
 
@@ -162,23 +179,20 @@ public class PlanoAlimentarService : IPlanoAlimentar
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
         // Desativar plano ativo anterior
-        var planosAtivos = await _context.PlanosAlimentares
-            .Where(p => p.PerfilNutricionalId == perfil.Id && p.Status == EStatusPlano.Ativo)
-            .ToListAsync();
+        var planosAtivos = await _planoRepository.ListarAtivosPorPerfilAsync(perfil.Id);
         foreach (var ativo in planosAtivos)
         {
             ativo.Status = EStatusPlano.Pausado;
             ativo.AtualizadoEm = DateTime.UtcNow;
         }
 
-        var plano = await _context.PlanosAlimentares
-            .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
+        var plano = await _planoRepository.ObterPorIdEPerfilAsync(planoId, perfil.Id);
         if (plano == null)
             return RetornoPadrao.NaoEncontrado("Plano alimentar não encontrado.");
 
         plano.Status = EStatusPlano.Ativo;
         plano.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Ok("Plano alimentar ativado com sucesso.");
     }
 
@@ -193,8 +207,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
 
-        var plano = await CarregarPlanoCompleto()
-            .FirstOrDefaultAsync(p => p.Id == planoId && p.PerfilNutricionalId == perfil.Id);
+        var plano = await _planoRepository.ObterCompletoPorIdEPerfilAsync(planoId, perfil.Id);
         if (plano == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Plano alimentar não encontrado.");
 
@@ -220,7 +233,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
 
         plano.RefeicoesPlanejadas.Add(refeicao);
         plano.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
             await MapearPlanoResultado(plano), "Refeição adicionada com sucesso.");
     }
@@ -231,16 +244,14 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var refeicao = await _context.Set<RefeicaoPlano>()
-            .Include(r => r.PlanoAlimentar)
-            .Include(r => r.Itens).ThenInclude(i => i.SubstituicoesEquivalentes)
-            .FirstOrDefaultAsync(r => r.Id == refeicaoId && r.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
+        var refeicao = await _refeicaoRepository
+            .ObterComItensESubstituicoesAsync(refeicaoId, perfil.Id);
         if (refeicao == null)
             return RetornoPadrao.NaoEncontrado("Refeição não encontrada.");
 
-        _context.Set<RefeicaoPlano>().Remove(refeicao);
+        _refeicaoRepository.Remove(refeicao);
         refeicao.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Ok("Refeição removida com sucesso.");
     }
 
@@ -255,10 +266,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
 
-        var refeicao = await _context.Set<RefeicaoPlano>()
-            .Include(r => r.PlanoAlimentar)
-            .Include(r => r.Itens)
-            .FirstOrDefaultAsync(r => r.Id == refeicaoId && r.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
+        var refeicao = await _refeicaoRepository.ObterComItensAsync(refeicaoId, perfil.Id);
         if (refeicao == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Refeição não encontrada.");
 
@@ -270,12 +278,11 @@ public class PlanoAlimentarService : IPlanoAlimentar
         refeicao.Itens.Add(item);
         RecalcularTotaisRefeicao(refeicao);
         refeicao.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
-        var plano = await CarregarPlanoCompleto()
-            .FirstAsync(p => p.Id == refeicao.PlanoAlimentarId);
+        var plano = await _planoRepository.ObterCompletoPorIdAsync(refeicao.PlanoAlimentarId);
         return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
-            await MapearPlanoResultado(plano), "Item adicionado com sucesso.");
+            await MapearPlanoResultado(plano!), "Item adicionado com sucesso.");
     }
 
     public async Task<RetornoPadrao> RemoverItemAsync(string userId, int itemId)
@@ -284,24 +291,20 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var item = await _context.Set<ItemRefeicao>()
-            .Include(i => i.RefeicaoPlano).ThenInclude(r => r.PlanoAlimentar)
-            .Include(i => i.SubstituicoesEquivalentes)
-            .FirstOrDefaultAsync(i => i.Id == itemId && i.RefeicaoPlano.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
+        var item = await _itemRefeicaoRepository
+            .ObterComRefeicaoEPlanoAsync(itemId, perfil.Id);
         if (item == null)
             return RetornoPadrao.NaoEncontrado("Item não encontrado.");
 
         var refeicao = item.RefeicaoPlano;
-        _context.Set<ItemRefeicao>().Remove(item);
+        _itemRefeicaoRepository.Remove(item);
         refeicao.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         // Recalcular totais da refeição sem o item removido
-        var refeicaoAtualizada = await _context.Set<RefeicaoPlano>()
-            .Include(r => r.Itens)
-            .FirstOrDefaultAsync(r => r.Id == refeicao.Id);
+        var refeicaoAtualizada = await _refeicaoRepository.ObterComItensPorIdAsync(refeicao.Id);
         if (refeicaoAtualizada != null) RecalcularTotaisRefeicao(refeicaoAtualizada);
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Ok("Item removido com sucesso.");
     }
@@ -317,10 +320,8 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var item = await _context.Set<ItemRefeicao>()
-            .Include(i => i.RefeicaoPlano).ThenInclude(r => r.PlanoAlimentar)
-            .Include(i => i.SubstituicoesEquivalentes)
-            .FirstOrDefaultAsync(i => i.Id == itemId && i.RefeicaoPlano.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
+        var item = await _itemRefeicaoRepository
+            .ObterComRefeicaoEPlanoAsync(itemId, perfil.Id);
         if (item == null)
             return RetornoPadrao.NaoEncontrado("Item não encontrado.");
 
@@ -331,7 +332,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         var sub = CriarSubstituicaoComMacros(alimento, dto.AlimentoId, dto.TipoTabela, dto.QuantidadeG);
         item.SubstituicoesEquivalentes.Add(sub);
         item.RefeicaoPlano.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
 
         return RetornoPadrao.Criado("Substituição adicionada com sucesso.");
     }
@@ -342,18 +343,14 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao.NaoEncontrado(PerfilAusente);
 
-        var sub = await _context.Set<SubstituicaoEquivalente>()
-            .Include(s => s.ItemRefeicao)
-                .ThenInclude(i => i.RefeicaoPlano)
-                    .ThenInclude(r => r.PlanoAlimentar)
-            .FirstOrDefaultAsync(s => s.Id == substituicaoId &&
-                s.ItemRefeicao.RefeicaoPlano.PlanoAlimentar.PerfilNutricionalId == perfil.Id);
+        var sub = await _substituicaoRepository
+            .ObterComItemRefeicaoEPlanoAsync(substituicaoId, perfil.Id);
         if (sub == null)
             return RetornoPadrao.NaoEncontrado("Substituição não encontrada.");
 
-        _context.Set<SubstituicaoEquivalente>().Remove(sub);
+        _substituicaoRepository.Remove(sub);
         sub.ItemRefeicao.RefeicaoPlano.PlanoAlimentar.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Ok("Substituição removida com sucesso.");
     }
 
@@ -423,23 +420,17 @@ public class PlanoAlimentarService : IPlanoAlimentar
         modelo.CarboidratoBaseG = Math.Round(totalCarb, 1);
         modelo.GorduraBaseG = Math.Round(totalGord, 1);
 
-        _context.ModelosDieta.Add(modelo);
-        await _context.SaveChangesAsync();
+        _modeloDietaRepository.Add(modelo);
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao<ModeloDietaResultadoDto>.Criado(
             MapearModeloResultado(modelo), "Modelo de dieta criado com sucesso.");
     }
 
     public async Task<RetornoPadrao<List<ModeloDietaResumoDto>>> ListarModelosDietaAsync(string? profissionalUserId)
     {
-        var query = _context.ModelosDieta.Where(m => m.Ativo);
+        var lista = await _modeloDietaRepository.ListarDisponiveisAsync(profissionalUserId);
 
-        if (profissionalUserId != null)
-            query = query.Where(m => m.Publico || m.CriadoPorProfissionalId == profissionalUserId);
-        else
-            query = query.Where(m => m.Publico);
-
-        var modelos = await query
-            .OrderBy(m => m.Nome)
+        var dto = lista
             .Select(m => new ModeloDietaResumoDto
             {
                 Id = m.Id,
@@ -451,17 +442,14 @@ public class PlanoAlimentarService : IPlanoAlimentar
                 NumeroRefeicoesDia = m.NumeroRefeicoesDia,
                 Publico = m.Publico
             })
-            .ToListAsync();
+            .ToList();
 
-        return RetornoPadrao<List<ModeloDietaResumoDto>>.Ok(modelos);
+        return RetornoPadrao<List<ModeloDietaResumoDto>>.Ok(dto);
     }
 
     public async Task<RetornoPadrao<ModeloDietaResultadoDto>> ObterModeloDietaAsync(int modeloId)
     {
-        var modelo = await _context.ModelosDieta
-            .Include(m => m.Refeicoes).ThenInclude(r => r.Itens)
-            .Include(m => m.CriadoPorProfissional)
-            .FirstOrDefaultAsync(m => m.Id == modeloId && m.Ativo);
+        var modelo = await _modeloDietaRepository.ObterCompletoAtivoAsync(modeloId);
         if (modelo == null)
             return RetornoPadrao<ModeloDietaResultadoDto>.NaoEncontrado("Modelo de dieta não encontrado.");
 
@@ -470,14 +458,14 @@ public class PlanoAlimentarService : IPlanoAlimentar
 
     public async Task<RetornoPadrao> ExcluirModeloDietaAsync(string profissionalUserId, int modeloId)
     {
-        var modelo = await _context.ModelosDieta
-            .FirstOrDefaultAsync(m => m.Id == modeloId && m.CriadoPorProfissionalId == profissionalUserId);
+        var modelo = await _modeloDietaRepository
+            .ObterPorIdEProfissionalAsync(modeloId, profissionalUserId);
         if (modelo == null)
             return RetornoPadrao.NaoEncontrado("Modelo de dieta não encontrado.");
 
         modelo.Ativo = false;
         modelo.AtualizadoEm = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao.Ok("Modelo de dieta excluído com sucesso.");
     }
 
@@ -488,15 +476,12 @@ public class PlanoAlimentarService : IPlanoAlimentar
         if (perfil == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
 
-        var modelo = await _context.ModelosDieta
-            .Include(m => m.Refeicoes).ThenInclude(r => r.Itens)
-            .FirstOrDefaultAsync(m => m.Id == modeloId && m.Ativo);
+        var modelo = await _modeloDietaRepository.ObterCompletoAtivoAsync(modeloId);
         if (modelo == null)
             return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Modelo de dieta não encontrado.");
 
         // Buscar metas do perfil para escalonar se necessário
-        var meta = await _context.MetasNutricionais
-            .FirstOrDefaultAsync(m => m.PerfilNutricionalId == perfil.Id);
+        var meta = await _metaRepository.ObterPorPerfilIdAsync(perfil.Id);
 
         double fatorEscala = 1.0;
         if (meta != null && modelo.CaloriasBase > 0)
@@ -550,8 +535,8 @@ public class PlanoAlimentarService : IPlanoAlimentar
             plano.RefeicoesPlanejadas.Add(refeicao);
         }
 
-        _context.PlanosAlimentares.Add(plano);
-        await _context.SaveChangesAsync();
+        _planoRepository.Add(plano);
+        await _unitOfWork.SaveChangesAsync();
         return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
             await MapearPlanoResultado(plano), "Plano alimentar criado a partir do modelo.");
     }
@@ -569,8 +554,7 @@ public class PlanoAlimentarService : IPlanoAlimentar
         PerfilNutricional perfil, CriarPlanoAlimentarDto dto, string? profissionalId)
     {
         // Buscar metas nutricionais para auto-preenchimento
-        var meta = await _context.MetasNutricionais
-            .FirstOrDefaultAsync(m => m.PerfilNutricionalId == perfil.Id);
+        var meta = await _metaRepository.ObterPorPerfilIdAsync(perfil.Id);
 
         var plano = new PlanoAlimentar
         {
@@ -706,17 +690,6 @@ public class PlanoAlimentarService : IPlanoAlimentar
         refeicao.TotalCarboidratoG = Math.Round(refeicao.Itens.Sum(i => i.CarboidratoG), 1);
         refeicao.TotalGorduraG = Math.Round(refeicao.Itens.Sum(i => i.GorduraG), 1);
         refeicao.TotalFibraG = Math.Round(refeicao.Itens.Sum(i => i.FibraG), 1);
-    }
-
-    private IQueryable<PlanoAlimentar> CarregarPlanoCompleto()
-    {
-        return _context.PlanosAlimentares
-            .Include(p => p.PerfilNutricional)
-            .Include(p => p.ProfissionalResponsavel)
-            .Include(p => p.ModeloDietaOrigem)
-            .Include(p => p.RefeicoesPlanejadas.OrderBy(r => r.Ordem))
-                .ThenInclude(r => r.Itens.OrderBy(i => i.Ordem))
-                    .ThenInclude(i => i.SubstituicoesEquivalentes);
     }
 
     private async Task<PlanoAlimentarResultadoDto> MapearPlanoResultado(PlanoAlimentar plano)
@@ -868,16 +841,11 @@ public class PlanoAlimentarService : IPlanoAlimentar
     /// e escolhe o status HTTP é o método público — helper não conhece HTTP.
     /// </summary>
     private Task<PerfilNutricional?> ObterPerfil(string userId) =>
-        _context.PerfilNutricional.FirstOrDefaultAsync(p => p.UserId == userId);
+        _perfilRepository.ObterPorUsuarioIdAsync(userId);
 
     private const string PerfilAusente =
         "Perfil nutricional não encontrado. Crie o perfil antes de gerenciar planos alimentares.";
 
     private Task<bool> ExisteVinculoAtivo(string profissionalUserId, string pacienteUserId) =>
-        _context.VinculosPacienteProfissional
-            .Include(v => v.Profissional)
-            .AnyAsync(v =>
-                v.Profissional.UserId == profissionalUserId &&
-                v.PacienteUserId == pacienteUserId &&
-                v.Status == EStatusVinculo.Ativo);
+        _vinculoRepository.ExisteVinculoAtivoAsync(profissionalUserId, pacienteUserId);
 }

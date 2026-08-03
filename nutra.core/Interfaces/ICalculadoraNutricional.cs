@@ -7,6 +7,7 @@ public interface ICalculadoraNutricional
 {
     /// <summary>
     /// Gera a meta nutricional inicial a partir do perfil (fluxo original de cadastro).
+    /// Não vai no banco - regra pura
     /// </summary>
     MetaNutricional GerarMetaInicial(PerfilNutricional perfil);
 

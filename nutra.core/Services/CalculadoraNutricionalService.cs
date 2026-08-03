@@ -6,6 +6,7 @@ namespace Nutra.Services;
 
 /// <summary>
 /// Serviço central de cálculos nutricionais e antropométricos.
+/// Não vai no banco - regra pura
 /// Implementa múltiplas fórmulas validadas pela literatura científica.
 /// </summary>
 public class CalculadoraNutricionalService : ICalculadoraNutricional

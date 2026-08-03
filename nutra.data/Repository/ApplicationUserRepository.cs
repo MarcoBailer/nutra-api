@@ -3,27 +3,25 @@ using Nutra.Data;
 using Nutra.Interfaces;
 using Nutra.Models.Usuario;
 
-namespace Nutra.Services;
+namespace Nutra.Repository;
 
-public class ApplicationUserService : IApplicationUserService
+public class ApplicationUserRepository : IApplicationUserRepository
 {
     private readonly AlimentosContext _context;
 
-    public ApplicationUserService(AlimentosContext context)
+    public ApplicationUserRepository(AlimentosContext context)
     {
         _context = context;
     }
 
     public async Task<ApplicationUser?> FindByIdAsync(string userId)
     {
-        return await _context.ApplicationUsers
-            .FirstOrDefaultAsync(user => user.Id == userId);
+        return await _context.ApplicationUsers.FindAsync(userId);
     }
 
     public async Task<ApplicationUser?> FindByEmailAsync(string email)
     {
-        return await _context.ApplicationUsers
-            .FirstOrDefaultAsync(user => user.Email == email);
+        return await _context.ApplicationUsers.FirstOrDefaultAsync(user => user.Email == email);
     }
 
     public async Task<ApplicationUser> CreateAsync(ApplicationUser user)
@@ -35,8 +33,7 @@ public class ApplicationUserService : IApplicationUserService
 
     public async Task<bool> UpdateAsync(ApplicationUser user)
     {
-        var existing = await _context.ApplicationUsers
-            .FirstOrDefaultAsync(current => current.Id == user.Id);
+        var existing = await _context.ApplicationUsers.FirstOrDefaultAsync(current => current.Id == user.Id);
 
         if (existing == null)
         {
