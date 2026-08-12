@@ -48,4 +48,45 @@ public class BuscaController : ControllerBase
 
         return StatusCode(retorno.StatusCode, retorno);
     }
+
+    /// <summary>
+    /// Busca paginada dentro de uma única tabela. Substitui os quatro endpoints
+    /// de <c>api/Alimentos</c>, que só diferiam pela tabela — que já é
+    /// <see cref="ETipoTabela"/>, o mesmo discriminador de <c>BuscarPorId</c>.
+    /// <para>
+    /// Semântica de status preservada: termo vazio é 400, zero resultados é 404.
+    /// </para>
+    /// </summary>
+    [HttpGet("BuscarPorTabela/{tabela}/{termo}")]
+    public async Task<IActionResult> BuscarPorTabela(
+        ETipoTabela tabela,
+        string termo,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 10)
+    {
+        if (string.IsNullOrWhiteSpace(termo))
+        {
+            var invalido = RetornoPadrao<PaginatedResultDto<AlimentoResumoDto>>
+                .Invalido("O termo de busca não pode ser vazio.");
+            return StatusCode(invalido.StatusCode, invalido);
+        }
+
+        // Sem o piso, Skip recebe valor negativo e estoura em 500. O teto evita
+        // que o client peça a tabela inteira em uma requisição.
+        if (pageNumber < 1 || pageSize < 1 || pageSize > 100)
+        {
+            var invalido = RetornoPadrao<PaginatedResultDto<AlimentoResumoDto>>
+                .Invalido("pageNumber deve ser >= 1 e pageSize deve estar entre 1 e 100.");
+            return StatusCode(invalido.StatusCode, invalido);
+        }
+
+        var pagina = await _buscaService.BuscaAlimentoPaginadoAsync(termo, tabela, pageNumber, pageSize);
+
+        var retorno = pagina.TotalCount == 0
+            ? RetornoPadrao<PaginatedResultDto<AlimentoResumoDto>>
+                .NaoEncontrado("Nenhum alimento encontrado com os termos informados.")
+            : RetornoPadrao<PaginatedResultDto<AlimentoResumoDto>>.Ok(pagina);
+
+        return StatusCode(retorno.StatusCode, retorno);
+    }
 }

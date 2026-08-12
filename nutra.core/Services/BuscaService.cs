@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Nutra.Enum;
 using Nutra.Interfaces;
 using Nutra.Models.Alimentos;
@@ -89,6 +90,65 @@ namespace Nutra.Services
             }
 
             return alimentoEncontrado;
+        }
+
+        public async Task<PaginatedResultDto<AlimentoResumoDto>> BuscaAlimentoPaginadoAsync(
+            string termo, ETipoTabela tabela, int pageNumber, int pageSize)
+        {
+            var palavras = termo.ToLower().Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            return tabela switch
+            {
+                ETipoTabela.Tbcas => await PaginarAsync(
+                    _tbcaRepository,
+                    Filtros<Tbca>(palavras, p => t => t.Nome != null && t.Nome.ToLower().Contains(p)),
+                    t => t.Id, pageNumber, pageSize, MapTbcaToDto),
+
+                ETipoTabela.Fabricantes => await PaginarAsync(
+                    _fabricanteRepository,
+                    Filtros<Fabricantes>(palavras, p => f => f.Produto != null && f.Produto.ToLower().Contains(p)),
+                    f => f.Id, pageNumber, pageSize, MapFabricanteToDto),
+
+                ETipoTabela.FastFoods => await PaginarAsync(
+                    _fastFoodRepository,
+                    Filtros<FastFood>(palavras, p => ff => ff.Produto != null && ff.Produto.ToLower().Contains(p)),
+                    ff => ff.Id, pageNumber, pageSize, MapFastFoodToDto),
+
+                ETipoTabela.Genericos => await PaginarAsync(
+                    _genericoRepository,
+                    Filtros<Genericos>(palavras, p => g => g.Produto != null && g.Produto.ToLower().Contains(p)),
+                    g => g.Id, pageNumber, pageSize, MapGenericoToDto),
+
+                _ => throw new ArgumentOutOfRangeException(nameof(tabela), tabela, null)
+            };
+        }
+
+        /// <summary>
+        /// Um filtro por palavra. Todos são aplicados em AND pelo repositório, então
+        /// "arroz integral" casa "Arroz, integral, cozido" — e não a string inteira.
+        /// </summary>
+        private static List<Expression<Func<T, bool>>> Filtros<T>(
+            IEnumerable<string> palavras, Func<string, Expression<Func<T, bool>>> montar) =>
+            palavras.Select(montar).ToList();
+
+        private static async Task<PaginatedResultDto<AlimentoResumoDto>> PaginarAsync<T>(
+            IBaseRepository<T> repositorio,
+            IReadOnlyCollection<Expression<Func<T, bool>>> filtros,
+            Expression<Func<T, int>> ordenacao,
+            int pageNumber,
+            int pageSize,
+            Func<T, AlimentoResumoDto> mapear) where T : class
+        {
+            var (itens, total) = await repositorio.FindPagedAsync(filtros, ordenacao, pageNumber, pageSize);
+
+            return new PaginatedResultDto<AlimentoResumoDto>
+            {
+                PageNumber = pageNumber,
+                PageSize = pageSize,
+                TotalCount = total,
+                TotalPages = (int)Math.Ceiling(total / (double)pageSize),
+                Items = itens.Select(mapear).ToList()
+            };
         }
 
         private AlimentoResumoDto MapTbcaToDto(Tbca t)

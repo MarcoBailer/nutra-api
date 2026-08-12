@@ -23,6 +23,25 @@ public interface IBaseRepository<T> where T : class
     /// <summary>Igual ao <see cref="FindAsync(Expression{Func{T, bool}})"/>, mas o corte acontece no banco.</summary>
     Task<IEnumerable<T>> FindAsync(Expression<Func<T, bool>> predicate, int limite);
 
+    /// <summary>
+    /// Uma página de resultados mais o total de registros que casam com o filtro.
+    /// <para>
+    /// <paramref name="predicates"/> é uma coleção porque os filtros entram em
+    /// conjunção (AND): é assim que a busca por várias palavras é expressa sem
+    /// montar árvore de expressão na mão.
+    /// </para>
+    /// <para>
+    /// <paramref name="orderBy"/> é obrigatório: paginar sem <c>ORDER BY</c> deixa
+    /// a ordem a critério do banco, e a mesma linha pode aparecer em duas páginas
+    /// ou em nenhuma.
+    /// </para>
+    /// </summary>
+    Task<(IReadOnlyList<T> Items, int TotalCount)> FindPagedAsync<TKey>(
+        IReadOnlyCollection<Expression<Func<T, bool>>> predicates,
+        Expression<Func<T, TKey>> orderBy,
+        int pageNumber,
+        int pageSize);
+
     Task<T?> FirstOrDefaultAsync(Expression<Func<T, bool>> predicate);
     Task<bool> AnyAsync(Expression<Func<T, bool>> predicate);
 
