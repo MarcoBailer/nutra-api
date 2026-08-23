@@ -1,11 +1,10 @@
 ## ==================================================================
-## DOCKER COMPOSE - Nutra (API + Frontend + DB + Redis)
+## DOCKER COMPOSE - Nutra (API + Frontend + DB)
 ## ==================================================================
 ## Domínio nutricional completo:
 ##   - nutra-api (.NET 9)
 ##   - nutra-frontend (Next.js 16)
 ##   - db-nutra (PostgreSQL 16)
-##   - redis (sessões NextAuth)
 ##
 ## Diretório no servidor: /opt/nutra/
 ## Pré-requisito: docker network create app-network
@@ -76,8 +75,6 @@ services:
     depends_on:
       nutra-api:
         condition: service_healthy
-      redis:
-        condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3000/nutra-app"]
       interval: 30s
@@ -91,31 +88,6 @@ services:
         limits:
           memory: 256M
           cpus: "1.0"
-
-  # ================================================================
-  # REDIS - Session Storage (NextAuth)
-  # ================================================================
-  redis:
-    image: redis:7-alpine
-    container_name: redis-sessions
-    restart: unless-stopped
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis-dev-password}
-    volumes:
-      - redis-data:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - app-network
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: "0.5"
 
   # ================================================================
   # BANCO DE DADOS - PostgreSQL (Nutra)
