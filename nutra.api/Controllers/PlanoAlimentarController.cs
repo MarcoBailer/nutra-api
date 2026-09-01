@@ -4,7 +4,7 @@ using Nutra.Interfaces;
 using Nutra.Models.Dtos;
 using System.Security.Claims;
 
-namespace Nutra.Controllers;
+namespace nutra.api.Controllers;
 
 [Route("api/[controller]")]
 [ApiController]
@@ -175,63 +175,6 @@ public class PlanoAlimentarController : ControllerBase
     public async Task<IActionResult> RemoverSubstituicao(int substituicaoId)
     {
         var retorno = await _planoService.RemoverSubstituicaoAsync(GetUserId(), substituicaoId);
-        return StatusCode(retorno.StatusCode, retorno);
-    }
-
-    // ============================================================
-    // Modelos de Dieta (Templates)
-    // ============================================================
-
-    /// <summary>
-    /// Cria um novo modelo/template de dieta (profissional).
-    /// </summary>
-    [HttpPost("modelos")]
-    public async Task<IActionResult> CriarModeloDieta([FromBody] CriarModeloDietaDto dto)
-    {
-        var retorno = await _planoService.CriarModeloDietaAsync(GetUserId(), dto);
-        return StatusCode(retorno.StatusCode, retorno);
-    }
-
-    /// <summary>
-    /// Lista modelos de dieta disponíveis (públicos + do profissional).
-    /// </summary>
-    [HttpGet("modelos")]
-    public async Task<IActionResult> ListarModelos()
-    {
-        var retorno = await _planoService.ListarModelosDietaAsync(GetUserId());
-        return StatusCode(retorno.StatusCode, retorno);
-    }
-
-    /// <summary>
-    /// Obtém detalhes de um modelo de dieta.
-    /// </summary>
-    [HttpGet("modelos/{modeloId:int}")]
-    public async Task<IActionResult> ObterModeloDieta(int modeloId)
-    {
-        var retorno = await _planoService.ObterModeloDietaAsync(modeloId);
-        return StatusCode(retorno.StatusCode, retorno);
-    }
-
-    /// <summary>
-    /// Exclui (soft delete) um modelo de dieta criado pelo profissional.
-    /// </summary>
-    [HttpDelete("modelos/{modeloId:int}")]
-    public async Task<IActionResult> ExcluirModeloDieta(int modeloId)
-    {
-        var retorno = await _planoService.ExcluirModeloDietaAsync(GetUserId(), modeloId);
-        return StatusCode(retorno.StatusCode, retorno);
-    }
-
-    /// <summary>
-    /// Cria um plano alimentar a partir de um modelo de dieta, escalonado para as metas do usuário.
-    /// </summary>
-    [HttpPost("modelos/{modeloId:int}/criar-plano")]
-    public async Task<IActionResult> CriarPlanoAPartirDeModelo(
-        int modeloId,
-        [FromQuery] DateTime dataInicio,
-        [FromQuery] DateTime? dataFim = null)
-    {
-        var retorno = await _planoService.CriarPlanoAPartirDeModeloAsync(GetUserId(), modeloId, dataInicio, dataFim);
         return StatusCode(retorno.StatusCode, retorno);
     }
 }

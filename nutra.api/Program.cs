@@ -189,7 +189,6 @@ builder.Services.AddScoped<IPlanoAlimentarRepository, PlanoAlimentarRepository>(
 builder.Services.AddScoped<IRefeicaoPlanoRepository, RefeicaoPlanoRepository>();
 builder.Services.AddScoped<IItemRefeicaoRepository, ItemRefeicaoRepository>();
 builder.Services.AddScoped<ISubstituicaoEquivalenteRepository, SubstituicaoEquivalenteRepository>();
-builder.Services.AddScoped<IModeloDietaRepository, ModeloDietaRepository>();
 builder.Services.AddScoped<IRegistroAlimentarRepository, RegistroAlimentarRepository>();
 builder.Services.AddScoped<IFotoRefeicaoRepository, FotoRefeicaoRepository>();
 

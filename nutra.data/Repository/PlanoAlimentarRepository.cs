@@ -83,7 +83,6 @@ public class PlanoAlimentarRepository : BaseRepository<PlanoAlimentar>, IPlanoAl
         return _dbSet
             .Include(p => p.PerfilNutricional)
             .Include(p => p.ProfissionalResponsavel)
-            .Include(p => p.ModeloDietaOrigem)
             .Include(p => p.RefeicoesPlanejadas.OrderBy(r => r.Ordem))
                 .ThenInclude(r => r.Itens.OrderBy(i => i.Ordem))
                     .ThenInclude(i => i.SubstituicoesEquivalentes);

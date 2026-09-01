@@ -13,7 +13,6 @@ public class PlanoAlimentarService : IPlanoAlimentar
     private readonly IRefeicaoPlanoRepository _refeicaoRepository;
     private readonly IItemRefeicaoRepository _itemRefeicaoRepository;
     private readonly ISubstituicaoEquivalenteRepository _substituicaoRepository;
-    private readonly IModeloDietaRepository _modeloDietaRepository;
     private readonly IMetaNutricionalRepository _metaRepository;
     private readonly IPerfilNutricionalRepository _perfilRepository;
     private readonly IVinculoPacienteProfissionalRepository _vinculoRepository;
@@ -25,7 +24,6 @@ public class PlanoAlimentarService : IPlanoAlimentar
         IRefeicaoPlanoRepository refeicaoRepository,
         IItemRefeicaoRepository itemRefeicaoRepository,
         ISubstituicaoEquivalenteRepository substituicaoRepository,
-        IModeloDietaRepository modeloDietaRepository,
         IMetaNutricionalRepository metaRepository,
         IPerfilNutricionalRepository perfilRepository,
         IVinculoPacienteProfissionalRepository vinculoRepository,
@@ -36,7 +34,6 @@ public class PlanoAlimentarService : IPlanoAlimentar
         _refeicaoRepository = refeicaoRepository;
         _itemRefeicaoRepository = itemRefeicaoRepository;
         _substituicaoRepository = substituicaoRepository;
-        _modeloDietaRepository = modeloDietaRepository;
         _metaRepository = metaRepository;
         _perfilRepository = perfilRepository;
         _vinculoRepository = vinculoRepository;
@@ -355,193 +352,6 @@ public class PlanoAlimentarService : IPlanoAlimentar
     }
 
     // ============================================================
-    // Modelos de Dieta (Templates)
-    // ============================================================
-
-    public async Task<RetornoPadrao<ModeloDietaResultadoDto>> CriarModeloDietaAsync(
-        string profissionalUserId, CriarModeloDietaDto dto)
-    {
-        var modelo = new ModeloDieta
-        {
-            Nome = dto.Nome,
-            Descricao = dto.Descricao,
-            ObjetivoAlvo = dto.ObjetivoAlvo,
-            PreferenciaAlimentarAlvo = dto.PreferenciaAlimentarAlvo,
-            NumeroRefeicoesDia = dto.NumeroRefeicoesDia,
-            Publico = dto.Publico,
-            CriadoPorProfissionalId = profissionalUserId
-        };
-
-        double totalCal = 0, totalProt = 0, totalCarb = 0, totalGord = 0;
-
-        foreach (var refDto in dto.Refeicoes)
-        {
-            var refeicao = new RefeicaoModeloDieta
-            {
-                TipoRefeicao = refDto.TipoRefeicao,
-                HorarioSugerido = refDto.HorarioSugerido,
-                Ordem = refDto.Ordem,
-                PercentualCaloricoSugerido = refDto.PercentualCaloricoSugerido,
-                Observacoes = refDto.Observacoes
-            };
-
-            foreach (var itemDto in refDto.Itens)
-            {
-                var alimento = await _busca.BuscaAlimentoPorIdAsync(itemDto.AlimentoId, itemDto.TipoTabela);
-                if (alimento == null) continue;
-
-                var macros = CalcularMacrosProporcional(alimento, itemDto.QuantidadeG);
-                var item = new ItemModeloDieta
-                {
-                    AlimentoId = itemDto.AlimentoId,
-                    TipoTabela = itemDto.TipoTabela,
-                    NomeAlimentoSnapshot = alimento.Nome,
-                    QuantidadeG = itemDto.QuantidadeG,
-                    EnergiaKcal = macros.kcal,
-                    ProteinaG = macros.prot,
-                    CarboidratoG = macros.carb,
-                    GorduraG = macros.gord,
-                    FibraG = macros.fibra,
-                    Ordem = itemDto.Ordem
-                };
-
-                totalCal += macros.kcal;
-                totalProt += macros.prot;
-                totalCarb += macros.carb;
-                totalGord += macros.gord;
-                refeicao.Itens.Add(item);
-            }
-
-            modelo.Refeicoes.Add(refeicao);
-        }
-
-        modelo.CaloriasBase = Math.Round(totalCal, 1);
-        modelo.ProteinaBaseG = Math.Round(totalProt, 1);
-        modelo.CarboidratoBaseG = Math.Round(totalCarb, 1);
-        modelo.GorduraBaseG = Math.Round(totalGord, 1);
-
-        _modeloDietaRepository.Add(modelo);
-        await _unitOfWork.SaveChangesAsync();
-        return RetornoPadrao<ModeloDietaResultadoDto>.Criado(
-            MapearModeloResultado(modelo), "Modelo de dieta criado com sucesso.");
-    }
-
-    public async Task<RetornoPadrao<List<ModeloDietaResumoDto>>> ListarModelosDietaAsync(string? profissionalUserId)
-    {
-        var lista = await _modeloDietaRepository.ListarDisponiveisAsync(profissionalUserId);
-
-        var dto = lista
-            .Select(m => new ModeloDietaResumoDto
-            {
-                Id = m.Id,
-                Nome = m.Nome,
-                Descricao = m.Descricao,
-                ObjetivoAlvo = m.ObjetivoAlvo,
-                PreferenciaAlimentarAlvo = m.PreferenciaAlimentarAlvo,
-                CaloriasBase = m.CaloriasBase,
-                NumeroRefeicoesDia = m.NumeroRefeicoesDia,
-                Publico = m.Publico
-            })
-            .ToList();
-
-        return RetornoPadrao<List<ModeloDietaResumoDto>>.Ok(dto);
-    }
-
-    public async Task<RetornoPadrao<ModeloDietaResultadoDto>> ObterModeloDietaAsync(int modeloId)
-    {
-        var modelo = await _modeloDietaRepository.ObterCompletoAtivoAsync(modeloId);
-        if (modelo == null)
-            return RetornoPadrao<ModeloDietaResultadoDto>.NaoEncontrado("Modelo de dieta não encontrado.");
-
-        return RetornoPadrao<ModeloDietaResultadoDto>.Ok(MapearModeloResultado(modelo));
-    }
-
-    public async Task<RetornoPadrao> ExcluirModeloDietaAsync(string profissionalUserId, int modeloId)
-    {
-        var modelo = await _modeloDietaRepository
-            .ObterPorIdEProfissionalAsync(modeloId, profissionalUserId);
-        if (modelo == null)
-            return RetornoPadrao.NaoEncontrado("Modelo de dieta não encontrado.");
-
-        modelo.Ativo = false;
-        modelo.AtualizadoEm = DateTime.UtcNow;
-        await _unitOfWork.SaveChangesAsync();
-        return RetornoPadrao.Ok("Modelo de dieta excluído com sucesso.");
-    }
-
-    public async Task<RetornoPadrao<PlanoAlimentarResultadoDto>> CriarPlanoAPartirDeModeloAsync(
-        string userId, int modeloId, DateTime dataInicio, DateTime? dataFim)
-    {
-        var perfil = await ObterPerfil(userId);
-        if (perfil == null)
-            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado(PerfilAusente);
-
-        var modelo = await _modeloDietaRepository.ObterCompletoAtivoAsync(modeloId);
-        if (modelo == null)
-            return RetornoPadrao<PlanoAlimentarResultadoDto>.NaoEncontrado("Modelo de dieta não encontrado.");
-
-        // Buscar metas do perfil para escalonar se necessário
-        var meta = await _metaRepository.ObterPorPerfilIdAsync(perfil.Id);
-
-        double fatorEscala = 1.0;
-        if (meta != null && modelo.CaloriasBase > 0)
-            fatorEscala = meta.CaloriasDiarias / modelo.CaloriasBase;
-
-        var plano = new PlanoAlimentar
-        {
-            PerfilNutricionalId = perfil.Id,
-            Nome = $"{modelo.Nome} (personalizado)",
-            Descricao = modelo.Descricao,
-            DataInicio = dataInicio,
-            DataFim = dataFim,
-            Status = EStatusPlano.Rascunho,
-            ModeloDietaOrigemId = modeloId,
-            CaloriasAlvoDiarias = meta?.CaloriasDiarias ?? modelo.CaloriasBase,
-            ProteinaAlvoG = meta?.ProteinasDiarias ?? modelo.ProteinaBaseG,
-            CarboidratoAlvoG = meta?.CarboidratosDiarios ?? modelo.CarboidratoBaseG,
-            GorduraAlvoG = meta?.GordurasDiarias ?? modelo.GorduraBaseG,
-            FibraAlvoG = meta?.FibraDiaria ?? 25,
-            AguaAlvoL = meta?.AguaDiaria ?? 2.0,
-        };
-
-        foreach (var refModelo in modelo.Refeicoes.OrderBy(r => r.Ordem))
-        {
-            var refeicao = new RefeicaoPlano
-            {
-                TipoRefeicao = refModelo.TipoRefeicao,
-                HorarioSugerido = refModelo.HorarioSugerido,
-                Ordem = refModelo.Ordem,
-                Observacoes = refModelo.Observacoes
-            };
-
-            foreach (var itemModelo in refModelo.Itens.OrderBy(i => i.Ordem))
-            {
-                refeicao.Itens.Add(new ItemRefeicao
-                {
-                    AlimentoId = itemModelo.AlimentoId,
-                    TipoTabela = itemModelo.TipoTabela,
-                    NomeAlimentoSnapshot = itemModelo.NomeAlimentoSnapshot,
-                    QuantidadeG = Math.Round(itemModelo.QuantidadeG * fatorEscala, 1),
-                    EnergiaKcal = Math.Round(itemModelo.EnergiaKcal * fatorEscala, 1),
-                    ProteinaG = Math.Round(itemModelo.ProteinaG * fatorEscala, 1),
-                    CarboidratoG = Math.Round(itemModelo.CarboidratoG * fatorEscala, 1),
-                    GorduraG = Math.Round(itemModelo.GorduraG * fatorEscala, 1),
-                    FibraG = Math.Round(itemModelo.FibraG * fatorEscala, 1),
-                    Ordem = itemModelo.Ordem
-                });
-            }
-
-            RecalcularTotaisRefeicao(refeicao);
-            plano.RefeicoesPlanejadas.Add(refeicao);
-        }
-
-        _planoRepository.Add(plano);
-        await _unitOfWork.SaveChangesAsync();
-        return RetornoPadrao<PlanoAlimentarResultadoDto>.Criado(
-            await MapearPlanoResultado(plano), "Plano alimentar criado a partir do modelo.");
-    }
-
-    // ============================================================
     // Helpers privados
     // ============================================================
 
@@ -710,7 +520,6 @@ public class PlanoAlimentarService : IPlanoAlimentar
             Status = plano.Status,
             Observacoes = plano.Observacoes,
             ProfissionalResponsavel = plano.ProfissionalResponsavel?.NomeCompleto,
-            ModeloDietaOrigem = plano.ModeloDietaOrigem?.Nome,
             CriadoEm = plano.CriadoEm,
             AtualizadoEm = plano.AtualizadoEm,
             MetasDiarias = new MacrosDiariosPlanoDto
@@ -780,57 +589,6 @@ public class PlanoAlimentarService : IPlanoAlimentar
                         GorduraG = s.GorduraG,
                         FibraG = s.FibraG
                     }).ToList()
-                }).ToList()
-            }).ToList()
-        };
-    }
-
-    private ModeloDietaResultadoDto MapearModeloResultado(ModeloDieta modelo)
-    {
-        double totalCal = modelo.Refeicoes.SelectMany(r => r.Itens).Sum(i => i.EnergiaKcal);
-
-        return new ModeloDietaResultadoDto
-        {
-            Id = modelo.Id,
-            Nome = modelo.Nome,
-            Descricao = modelo.Descricao,
-            ObjetivoAlvo = modelo.ObjetivoAlvo,
-            PreferenciaAlimentarAlvo = modelo.PreferenciaAlimentarAlvo,
-            CaloriasBase = modelo.CaloriasBase,
-            ProteinaBaseG = modelo.ProteinaBaseG,
-            CarboidratoBaseG = modelo.CarboidratoBaseG,
-            GorduraBaseG = modelo.GorduraBaseG,
-            NumeroRefeicoesDia = modelo.NumeroRefeicoesDia,
-            Publico = modelo.Publico,
-            CriadoPorProfissional = modelo.CriadoPorProfissional?.NomeCompleto,
-            Refeicoes = modelo.Refeicoes.OrderBy(r => r.Ordem).Select(r => new RefeicaoPlanoResultadoDto
-            {
-                Id = r.Id,
-                TipoRefeicao = r.TipoRefeicao,
-                HorarioSugerido = r.HorarioSugerido,
-                Ordem = r.Ordem,
-                Observacoes = r.Observacoes,
-                TotalEnergiaKcal = r.Itens.Sum(i => i.EnergiaKcal),
-                TotalProteinaG = r.Itens.Sum(i => i.ProteinaG),
-                TotalCarboidratoG = r.Itens.Sum(i => i.CarboidratoG),
-                TotalGorduraG = r.Itens.Sum(i => i.GorduraG),
-                TotalFibraG = r.Itens.Sum(i => i.FibraG),
-                PercentualCaloricoRefeicao = totalCal > 0
-                    ? Math.Round(r.Itens.Sum(i => i.EnergiaKcal) / totalCal * 100, 1)
-                    : r.PercentualCaloricoSugerido,
-                Itens = r.Itens.OrderBy(i => i.Ordem).Select(i => new ItemRefeicaoResultadoDto
-                {
-                    Id = i.Id,
-                    AlimentoId = i.AlimentoId,
-                    TipoTabela = i.TipoTabela,
-                    NomeAlimento = i.NomeAlimentoSnapshot,
-                    QuantidadeG = i.QuantidadeG,
-                    Ordem = i.Ordem,
-                    EnergiaKcal = i.EnergiaKcal,
-                    ProteinaG = i.ProteinaG,
-                    CarboidratoG = i.CarboidratoG,
-                    GorduraG = i.GorduraG,
-                    FibraG = i.FibraG
                 }).ToList()
             }).ToList()
         };
