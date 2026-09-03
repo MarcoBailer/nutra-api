@@ -42,9 +42,11 @@ RUN chown -R appuser:appuser /app
 # Troca para usuário não-root
 USER appuser
 
-# Healthcheck interno do container
+# Healthcheck interno do container.
+# A imagem aspnet:9.0 nao traz curl/wget, so bash — entao testa a porta via
+# /dev/tcp em vez de HTTP (tambem evita depender do pathbase /nutra-api).
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD bash -c 'echo > /dev/tcp/localhost/8080' || exit 1
 
 EXPOSE 8080
 

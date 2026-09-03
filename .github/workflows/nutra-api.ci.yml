@@ -9,9 +9,9 @@ name: CI/CD - Nutra API
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
 
 env:
   REGISTRY: ghcr.io
@@ -81,7 +81,11 @@ jobs:
             set -e
             cd /opt/nutra
 
+            # Rede compartilhada com o proxy (idempotente)
+            docker network inspect app-network >/dev/null 2>&1 || docker network create app-network
+
             # Gera .env (lead repo — gera para todo o compose nutra)
+            # APP_BASE_URL deve vir SEM barra no final; o compose deriva as variantes.
             cat > .env << 'ENVEOF'
             APP_BASE_URL=${{ secrets.APP_BASE_URL }}
             ASPNETCORE_ENVIRONMENT=Production
@@ -91,12 +95,8 @@ jobs:
             NUTRA_DB_NAME=${{ secrets.NUTRA_DB_NAME }}
             NUTRA_DB_USER=${{ secrets.NUTRA_DB_USER }}
             NUTRA_DB_PASSWORD=${{ secrets.NUTRA_DB_PASSWORD }}
-            NUTRA_DB_PORT=5433
-            NUTRA_OAUTH_CLIENT_ID=${{ secrets.NUTRA_OAUTH_CLIENT_ID }}
-            NUTRA_OAUTH_CLIENT_SECRET=${{ secrets.NUTRA_OAUTH_CLIENT_SECRET }}
-            REDIS_PASSWORD=${{ secrets.REDIS_PASSWORD }}
-            REDIS_PORT=6379
-            NUTRA_FRONTEND_NEXTAUTH_SECRET=${{ secrets.NUTRA_FRONTEND_NEXTAUTH_SECRET }}
+            NUTRA_API_AUDIENCE=${{ secrets.NUTRA_API_AUDIENCE }}
+            NUTRA_FRONTEND_AUTH_SECRET=${{ secrets.NUTRA_FRONTEND_AUTH_SECRET }}
             NUTRA_FRONTEND_OIDC_CLIENT_ID=${{ secrets.NUTRA_FRONTEND_OIDC_CLIENT_ID }}
             NUTRA_FRONTEND_OIDC_CLIENT_SECRET=${{ secrets.NUTRA_FRONTEND_OIDC_CLIENT_SECRET }}
             ENVEOF
@@ -104,7 +104,7 @@ jobs:
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USER }}" --password-stdin
 
             docker compose pull nutra-api
-            docker compose up -d --no-deps nutra-api
+            docker compose up -d db-nutra nutra-api
 
             sleep 15
             docker compose ps

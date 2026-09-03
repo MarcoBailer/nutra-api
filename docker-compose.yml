@@ -22,10 +22,17 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
       - ASPNETCORE_URLS=http://+:8080
+      # Ativa o app.UsePathBase("/nutra-api") do Program.cs. O nginx repassa
+      # /nutra-api/... SEM rewrite, então sem esta flag toda rota dá 404.
+      - DOCKER_CONTAINER=true
       - ConnectionStrings__DefaultConnection=Host=db-nutra;Port=5432;Database=${NUTRA_DB_NAME:-nutra_db};Username=${NUTRA_DB_USER:-nutra_user};Password=${NUTRA_DB_PASSWORD:?NUTRA_DB_PASSWORD required}
-      - Authentication__Authority=${APP_BASE_URL:-http://localhost}
-      - Authentication__ClientId=${NUTRA_OAUTH_CLIENT_ID:?NUTRA_OAUTH_CLIENT_ID required}
-      - Authentication__ClientSecret=${NUTRA_OAUTH_CLIENT_SECRET:?NUTRA_OAUTH_CLIENT_SECRET required}
+      # COM barra final: o Program.cs usa Authority também como ValidIssuer, e o
+      # OpenIddict emite iss="https://host/" (com barra). Sem a barra → 401 em tudo.
+      - Authentication__Authority=${APP_BASE_URL:-http://localhost}/
+      # Obrigatório (Program.cs lança InvalidOperationException se faltar).
+      # Deve casar com o claim "aud", que vem dos Resources do scope no shark-lock.
+      - Authentication__Audience=${NUTRA_API_AUDIENCE:-projeto-nutra-api}
+      # Origem CORS — o ASP.NET exige origem SEM barra final para casar.
       - AppSettings__BaseUrlFront=${APP_BASE_URL:-http://localhost}
     volumes:
       - nutra-data-protection:/app/keys
@@ -60,17 +67,19 @@ services:
     environment:
       - HOSTNAME=0.0.0.0
       - PORT=3000
-      # NextAuth (runtime - server-side only)
-      - NEXTAUTH_URL=${APP_BASE_URL:-http://localhost}/nutra-app
-      - NEXTAUTH_SECRET=${NUTRA_FRONTEND_NEXTAUTH_SECRET:?NUTRA_FRONTEND_NEXTAUTH_SECRET required}
-      # OIDC Provider (runtime - server-side only)
+      # ── Auth.js v5 (runtime, server-side) ────────────────────────
+      # AUTH_SECRET, não NEXTAUTH_SECRET: o proxy BFF chama
+      # getToken({ secret: process.env.AUTH_SECRET }) explicitamente.
+      - AUTH_SECRET=${NUTRA_FRONTEND_AUTH_SECRET:?NUTRA_FRONTEND_AUTH_SECRET required}
+      # Precisa ser https:// — o BFF deriva secureCookie desta string. Em http
+      # ele procuraria o cookie sem o prefixo __Secure- e daria 401 em toda chamada.
+      - AUTH_URL=${APP_BASE_URL:-http://localhost}/nutra-app/api/auth
+      # ── OIDC Provider (runtime, server-side) ─────────────────────
+      # SEM barra final: o código monta ${OIDC_ISSUER}/.well-known/openid-configuration.
       - OIDC_ISSUER=${APP_BASE_URL:-http://localhost}
       - OIDC_CLIENT_ID=${NUTRA_FRONTEND_OIDC_CLIENT_ID:-nutra-http}
       - OIDC_CLIENT_SECRET=${NUTRA_FRONTEND_OIDC_CLIENT_SECRET:?NUTRA_FRONTEND_OIDC_CLIENT_SECRET required}
-      # Redis (runtime - server-side only)
-      - REDIS_URL=redis://redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis-dev-password}
-      # API interna (server-side, rede Docker)
+      # ── API interna (rede Docker; inclui o pathbase /nutra-api) ──
       - NUTRA_API_URL=http://nutra-api:8080/nutra-api
     depends_on:
       nutra-api:
@@ -92,6 +101,12 @@ services:
   # ================================================================
   # BANCO DE DADOS - PostgreSQL (Nutra)
   # ================================================================
+  # Fica só na nutra-db-network (internal: true): sem rota para fora e sem
+  # publicação de porta no host — em rede internal o Docker ignora "ports:".
+  # Acesso local pontual (DBeaver/psql):
+  #   docker exec -it db-nutra psql -U nutra_user -d nutra_db
+  #   docker run --rm -d --network nutra_nutra-db-network -p 127.0.0.1:5433:5433 \
+  #     alpine/socat tcp-listen:5433,fork,reuseaddr tcp-connect:db-nutra:5432
   db-nutra:
     image: postgres:16-alpine
     container_name: db-nutra
@@ -102,8 +117,6 @@ services:
       POSTGRES_PASSWORD: ${NUTRA_DB_PASSWORD:?NUTRA_DB_PASSWORD required}
     volumes:
       - nutra-postgres-data:/var/lib/postgresql/data
-    ports:
-      - "${NUTRA_DB_PORT:-5433}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${NUTRA_DB_USER:-nutra_user} -d ${NUTRA_DB_NAME:-nutra_db}"]
       interval: 10s
@@ -117,8 +130,6 @@ services:
           memory: 256M
 
 volumes:
-  redis-data:
-    driver: local
   nutra-postgres-data:
     driver: local
   nutra-data-protection:
