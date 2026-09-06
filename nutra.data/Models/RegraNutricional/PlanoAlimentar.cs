@@ -39,8 +39,7 @@ public class PlanoAlimentar
     // --- Referência a modelo de dieta (se baseado em template) ---
     public int? ModeloDietaOrigemId { get; set; }
     [ForeignKey("ModeloDietaOrigemId")]
-    public ModeloDieta? ModeloDietaOrigem { get; set; }
-
+    
     [MaxLength(2000)]
     public string? Observacoes { get; set; }
 

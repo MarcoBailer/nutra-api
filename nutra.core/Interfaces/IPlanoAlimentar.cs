@@ -27,12 +27,4 @@ public interface IPlanoAlimentar
     Task<RetornoPadrao> AdicionarSubstituicaoAsync(string userId, int itemId, AdicionarSubstituicaoDto dto);
     Task<RetornoPadrao> RemoverSubstituicaoAsync(string userId, int substituicaoId);
 
-    // --- Modelos de Dieta ---
-    Task<RetornoPadrao<ModeloDietaResultadoDto>> CriarModeloDietaAsync(string profissionalUserId, CriarModeloDietaDto dto);
-    Task<RetornoPadrao<List<ModeloDietaResumoDto>>> ListarModelosDietaAsync(string? profissionalUserId);
-    Task<RetornoPadrao<ModeloDietaResultadoDto>> ObterModeloDietaAsync(int modeloId);
-    Task<RetornoPadrao> ExcluirModeloDietaAsync(string profissionalUserId, int modeloId);
-
-    // --- Duplicar plano a partir de template ---
-    Task<RetornoPadrao<PlanoAlimentarResultadoDto>> CriarPlanoAPartirDeModeloAsync(string userId, int modeloId, DateTime dataInicio, DateTime? dataFim);
 }

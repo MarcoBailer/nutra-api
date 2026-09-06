@@ -43,9 +43,6 @@ public class AlimentosContext : DbContext
     public DbSet<RefeicaoPlano> RefeicoesPlanejadas { get; set; }
     public DbSet<ItemRefeicao> ItensRefeicao { get; set; }
     public DbSet<SubstituicaoEquivalente> SubstituicoesEquivalentes { get; set; }
-    public DbSet<ModeloDieta> ModelosDieta { get; set; }
-    public DbSet<RefeicaoModeloDieta> RefeicoeModelosDieta { get; set; }
-    public DbSet<ItemModeloDieta> ItensModelosDieta { get; set; }
 
     // --- Diário Alimentar (Etapa 5) ---
     public DbSet<FotoRefeicao> FotosRefeicao { get; set; }
@@ -168,12 +165,6 @@ public class AlimentosContext : DbContext
             .HasForeignKey(p => p.ProfissionalResponsavelId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        builder.Entity<PlanoAlimentar>()
-            .HasOne(p => p.ModeloDietaOrigem)
-            .WithMany()
-            .HasForeignKey(p => p.ModeloDietaOrigemId)
-            .OnDelete(DeleteBehavior.SetNull);
-
         // RefeicaoPlano -> PlanoAlimentar
         builder.Entity<RefeicaoPlano>()
             .HasOne(r => r.PlanoAlimentar)
@@ -193,27 +184,6 @@ public class AlimentosContext : DbContext
             .HasOne(s => s.ItemRefeicao)
             .WithMany(i => i.SubstituicoesEquivalentes)
             .HasForeignKey(s => s.ItemRefeicaoId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        // ModeloDieta -> CriadoPorProfissional
-        builder.Entity<ModeloDieta>()
-            .HasOne(m => m.CriadoPorProfissional)
-            .WithMany()
-            .HasForeignKey(m => m.CriadoPorProfissionalId)
-            .OnDelete(DeleteBehavior.SetNull);
-
-        // RefeicaoModeloDieta -> ModeloDieta
-        builder.Entity<RefeicaoModeloDieta>()
-            .HasOne(r => r.ModeloDieta)
-            .WithMany(m => m.Refeicoes)
-            .HasForeignKey(r => r.ModeloDietaId)
-            .OnDelete(DeleteBehavior.Cascade);
-
-        // ItemModeloDieta -> RefeicaoModeloDieta
-        builder.Entity<ItemModeloDieta>()
-            .HasOne(i => i.RefeicaoModeloDieta)
-            .WithMany(r => r.Itens)
-            .HasForeignKey(i => i.RefeicaoModeloDietaId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // ============================================================
